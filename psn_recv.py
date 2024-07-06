@@ -5,62 +5,77 @@ import struct
 MULTICAST_GROUP = '236.10.10.10'
 PORT = 56565
 
-# Define function to parse and display PSN_INFO packets
-def parse_psn_info_packet(data):
+# Function to parse and display PSN_INFO packets
+def parse_psn_info_packet(data, depth=0):
     index = 0
     tracker_count = 0
     trackers = []
-    
+
     while index < len(data):
-        chunk_id, data_len, has_subchunks = struct.unpack_from('<HHH', data, index)
-        index += 6
-        has_subchunks = (has_subchunks >> 15) & 0x1
-        print(f"Chunk ID: {chunk_id:#06x}")
-        print(f"Data Length: {data_len}")
-        print(f"Has Sub Chunks: {'Yes' if has_subchunks else 'No'}")
-        
+        chunk_id, data_field = struct.unpack_from('<HH', data, index)
+        data_len = data_field & 0x7FFF
+        has_subchunks = (data_field >> 15) & 0x1
+        index += 4
+
+        indent = '    ' * depth
+        print(f"{indent}Chunk ID: {chunk_id:#06x}")
+        print(f"{indent}Data Length: {data_len}")
+        print(f"{indent}Has Sub Chunks: {'Yes' if has_subchunks else 'No'}")
+
         if chunk_id == 0x6756:  # PSN_INFO_PACKET
-            parse_psn_info_packet(data[index:index+data_len])
+            parse_psn_info_packet(data[index:index + data_len], depth + 1)
         elif chunk_id == 0x0000:  # PSN_INFO_PACKET_HEADER
             timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, index)
-            print(f"Timestamp: {timestamp}")
-            print(f"Version High: {version_high}")
-            print(f"Version Low: {version_low}")
-            print(f"Frame ID: {frame_id}")
-            print(f"Frame Packet Count: {frame_packet_count}")
+            print(f"{indent}Timestamp: {timestamp}")
+            print(f"{indent}Version High: {version_high}")
+            print(f"{indent}Version Low: {version_low}")
+            print(f"{indent}Frame ID: {frame_id}")
+            print(f"{indent}Frame Packet Count: {frame_packet_count}")
         elif chunk_id == 0x0001:  # PSN_INFO_SYSTEM_NAME
-            system_name = data[index:index+data_len].decode('utf-8')
-            print(f"System Name: {system_name}")
+            system_name = data[index:index + data_len].decode('utf-8')
+            print(f"{indent}System Name: {system_name}")
         elif chunk_id == 0x0002:  # PSN_INFO_TRACKER_LIST
-            tracker_count, trackers = parse_tracker_list(data[index:index+data_len])
-        
+            trackers = parse_tracker_list(data[index:index + data_len], depth + 1)
+            tracker_count = len(trackers)
+
         index += data_len
-    
+
     print(f"Number of Trackers: {tracker_count}")
     for tracker in trackers:
         print(f"Tracker ID: {tracker['id']}, Name: {tracker['name']}")
 
-# Define function to parse tracker list
-def parse_tracker_list(data):
+# Function to parse tracker list
+def parse_tracker_list(data, depth=0):
     index = 0
     trackers = []
-    
+
     while index < len(data):
-        tracker_id, data_len, has_subchunks = struct.unpack_from('<HHH', data, index)
-        index += 6
-        has_subchunks = (has_subchunks >> 15) & 0x1
+        tracker_id, data_field = struct.unpack_from('<HH', data, index)
+        data_len = data_field & 0x7FFF
+        has_subchunks = (data_field >> 15) & 0x1
+        index += 4
+
+        indent = '    ' * depth
+        print(f"{indent}Tracker ID: {tracker_id}")
+        print(f"{indent}Data Length: {data_len}")
+        print(f"{indent}Has Sub Chunks: {'Yes' if has_subchunks else 'No'}")
+
         tracker_name = ''
-        
         if has_subchunks:
-            subchunk_id, subchunk_len, subchunk_has_subchunks = struct.unpack_from('<HHH', data, index)
-            index += 6
+            subchunk_id, subchunk_field = struct.unpack_from('<HH', data, index)
+            subchunk_len = subchunk_field & 0x7FFF
+            subchunk_has_subchunks = (subchunk_field >> 15) & 0x1
+            index += 4
+
             if subchunk_id == 0x0000:  # PSN_INFO_TRACKER_NAME
-                tracker_name = data[index:index+subchunk_len].decode('utf-8')
+                tracker_name = data[index:index + subchunk_len].decode('utf-8')
+                print(f"{indent}Tracker Name: {tracker_name}")
                 index += subchunk_len
 
         trackers.append({'id': tracker_id, 'name': tracker_name})
-    
-    return len(trackers), trackers
+        index += data_len
+
+    return trackers
 
 # Set up UDP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
