@@ -118,6 +118,12 @@ while True:
     data, addr = sock.recvfrom(BUFFER_SIZE)
     print(f"Received packet from {addr}")
 
+    # Print raw packet data for debugging
+    print(f"Raw packet data: {data.hex()}")
+
     chunks = decode_chunk(data)
     if 'info' in chunks:
+        # Print extracted info for debugging
         print("Extracted Info:", chunks['info'])
+    else:
+        print("No PSN_INFO chunk found.")
