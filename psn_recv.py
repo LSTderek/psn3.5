@@ -17,7 +17,7 @@ LOG_FILE = 'psn_receiver.log'
 # Set up logging
 logger = logging.getLogger('PSNReceiver')
 logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Corrected 'levellevel' to 'levelname'
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 if LOG_TO_FILE:
     file_handler = RotatingFileHandler(LOG_FILE, maxBytes=1024*1024, backupCount=5)
@@ -127,10 +127,12 @@ def format_tracker_list(tracker_list):
         formatted_list.append(f"    TrackerID: {tracker_id:<5} Name: {tracker_name}")
     return "\n".join(formatted_list)
 
-# Store available trackers
+# Store available trackers and active frame IDs
 trackers = {}
+active_frame_id = None
 
 def start_udp_receiver():
+    global active_frame_id
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind((MULTICAST_GROUP, PORT))
@@ -149,6 +151,7 @@ def start_udp_receiver():
                     tracker_list = []
                     for sub_chunk_type, sub_chunk_data in chunk_data:
                         if sub_chunk_type == 'PSN_INFO_PACKET_HEADER':
+                            active_frame_id = sub_chunk_data.frame_id
                             logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
                         elif sub_chunk_type == 'PSN_INFO_SYSTEM_NAME':
                             system_name = sub_chunk_data
@@ -160,12 +163,21 @@ def start_udp_receiver():
                             logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
 
                     # Update the trackers dictionary
+                    new_trackers = {}
                     for tracker_name, tracker_id in tracker_list:
-                        trackers[tracker_name] = {
+                        new_trackers[tracker_name] = {
                             'id': tracker_id,
                             'system_name': system_name,
                             'ip_address': ip_address
                         }
+                    
+                    # Remove trackers not in the current frame
+                    for tracker_name in list(trackers):
+                        if tracker_name not in new_trackers:
+                            del trackers[tracker_name]
+
+                    # Add or update trackers from the current frame
+                    trackers.update(new_trackers)
 
                     if DISPLAY_TRACKER_UPDATES:
                         print(f"Updated trackers: {trackers}")
