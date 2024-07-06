@@ -99,6 +99,8 @@ def parse_chunks(data, offset=0):
                 chunks.append(('PSN_INFO_PACKET', parse_psn_info_packet(chunk_data)))
             elif chunk_header.id == 0x6765:
                 chunks.append(('PSN_DATA_PACKET', parse_psn_data_packet(chunk_data)))
+            elif chunk_header.id == 26453:  # Handle specific chunk ID 26453
+                chunks.append(('SPECIFIC_CHUNK_26453', chunk_data))
             else:
                 logger.debug(f"Ignoring unknown chunk ID: {chunk_header.id}")
         except Exception as e:
@@ -245,6 +247,12 @@ def start_udp_receiver():
                             logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
                         else:
                             logger.info(f"  Tracker: {sub_chunk_type}, Data: {sub_chunk_data}")
+
+                elif chunk_type == 'SPECIFIC_CHUNK_26453':
+                    # Handle the specific chunk ID 26453 here
+                    logger.info(f"Received specific chunk 26453: {chunk_data}")
+                else:
+                    logger.debug(f"Ignoring unknown chunk ID: {chunk_type}")
         except Exception as e:
             logger.error(f"Error receiving data: {e}")
 
