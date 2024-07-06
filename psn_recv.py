@@ -92,7 +92,7 @@ def parse_psn_info_packet(data):
             if chunk_header.id == 0x0000:
                 chunks.append(('PSN_INFO_PACKET_HEADER', PSNInfoPacketHeader(chunk_data)))
             elif chunk_header.id == 0x0001:
-                chunks.append(('PSN_INFO_SYSTEM_NAME', chunk_data.decode('utf-8')))
+                chunks.append(('PSN_INFO_SYSTEM_NAME', chunk_data.decode('utf-8').strip('\x00')))
             elif chunk_header.id == 0x0002:
                 chunks.append(('PSN_INFO_TRACKER_LIST', parse_psn_info_tracker_list(chunk_data)))
             else:
@@ -112,7 +112,7 @@ def parse_psn_info_tracker_list(data):
             chunk_data = data[offset:offset + chunk_header.data_len]
             offset += chunk_header.data_len
             tracker_id = chunk_header.id
-            tracker_name = " ".join(chunk_data.decode('utf-8').split())
+            tracker_name = chunk_data.decode('utf-8').strip('\x00').strip()
             chunks.append((tracker_id, tracker_name))
         except Exception as e:
             logger.error(f"Error parsing PSN info tracker list: {e}")
