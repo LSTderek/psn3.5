@@ -2,6 +2,7 @@ import socket
 import struct
 import logging
 from logging.handlers import RotatingFileHandler
+import re
 
 MULTICAST_GROUP = '236.10.10.10'
 PORT = 56565
@@ -9,7 +10,8 @@ MAX_PACKET_SIZE = 1500
 
 # Configuration for logging
 LOG_TO_FILE = False
-LOG_TO_CONSOLE = False
+LOG_TO_CONSOLE = True
+DISPLAY_TRACKER_UPDATES = True
 LOG_FILE = 'psn_receiver.log'
 
 # Set up logging
@@ -112,7 +114,7 @@ def parse_psn_info_tracker_list(data):
             chunk_data = data[offset:offset + chunk_header.data_len]
             offset += chunk_header.data_len
             tracker_id = chunk_header.id
-            tracker_name = chunk_data.decode('utf-8').strip('\x00').strip()
+            tracker_name = re.sub(r'[^\x20-\x7E]+', '', chunk_data.decode('utf-8')).strip()
             chunks.append((tracker_id, tracker_name))
         except Exception as e:
             logger.error(f"Error parsing PSN info tracker list: {e}")
@@ -165,7 +167,8 @@ def start_udp_receiver():
                             'ip_address': ip_address
                         }
 
-                    logger.info(f"Updated trackers: {trackers}")
+                    if DISPLAY_TRACKER_UPDATES:
+                        print(f"Updated trackers: {trackers}")
         except Exception as e:
             logger.error(f"Error receiving data: {e}")
 
