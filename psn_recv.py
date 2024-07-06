@@ -1,80 +1,123 @@
 import socket
 import struct
 
-# Constants
-MULTICAST_IP = "236.10.10.10"
+MULTICAST_GROUP = '236.10.10.10'
 PORT = 56565
+BUFFER_SIZE = 1500
 
-# Define data structures
-class PSNChunkHeader:
-    def __init__(self, id, data_len, has_subchunks):
-        self.id = id
-        self.data_len = data_len
-        self.has_subchunks = has_subchunks
-
-class PSNInfoPacket:
-    def __init__(self, header, timestamp, version_high, version_low, frame_id, frame_packet_count):
-        self.header = header
-        self.timestamp = timestamp
-        self.version_high = version_high
-        self.version_low = version_low
-        self.frame_id = frame_id
-        self.frame_packet_count = frame_packet_count
-
-class PSNDataPacket:
-    def __init__(self, header, timestamp, version_high, version_low, frame_id, frame_packet_count):
-        self.header = header
-        self.timestamp = timestamp
-        self.version_high = version_high
-        self.version_low = version_low
-        self.frame_id = frame_id
-        self.frame_packet_count = frame_packet_count
-
-# Initialize UDP multicast
+# Create the UDP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-sock.bind((MULTICAST_IP, PORT))
-mreq = struct.pack("4sl", socket.inet_aton(MULTICAST_IP), socket.INADDR_ANY)
+
+# Bind to the server address
+sock.bind(('', PORT))
+
+# Tell the operating system to add the socket to the multicast group on all interfaces.
+mreq = struct.pack("4sl", socket.inet_aton(MULTICAST_GROUP), socket.INADDR_ANY)
 sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-def parse_packet(data):
-    print(f"Raw data: {data.hex()}")  # Debugging: print raw packet data in hexadecimal
+print(f"Listening for PSN packets on {MULTICAST_GROUP}:{PORT}...")
 
-    # Ensure packet is long enough to include header
-    if len(data) < 8:
-        print("Packet too short for header")
-        return None
+# Define chunk type identifiers
+CHUNK_TYPE_INFO_PACKET = 0x6756
+CHUNK_TYPE_INFO_PACKET_HEADER = 0x0000
+CHUNK_TYPE_INFO_SYSTEM_NAME = 0x0001
+CHUNK_TYPE_INFO_TRACKER_LIST = 0x0002
+CHUNK_TYPE_INFO_TRACKER_NAME = 0x0000
 
-    # Parse chunk header
-    chunk_id, data_len, has_subchunks = struct.unpack("<IHH", data[:8])
-    header = PSNChunkHeader(chunk_id, data_len, has_subchunks)
-    
-    print(f"Chunk ID: {hex(chunk_id)}, Data Length: {data_len}, Has Subchunks: {has_subchunks}")  # Debugging: print header details
+def decode_uint64(data, offset):
+    return struct.unpack_from('<Q', data, offset)[0], offset + 8
 
-    # Check known packet types
-    if chunk_id == 0x5567cc80:  # Assuming this is a correct packet type from observed data
-        if len(data) < 20:
-            print("Packet too short for PSN_INFO_PACKET or PSN_DATA_PACKET")
-            return None
+def decode_uint8(data, offset):
+    return struct.unpack_from('<B', data, offset)[0], offset + 1
 
-        timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack("<QBBBB", data[8:20])
-        print(f"Timestamp: {timestamp}, Version High: {version_high}, Version Low: {version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
+def decode_char_array(data, offset, length):
+    return data[offset:offset + length].decode('ascii'), offset + length
 
-        # Further classify as PSN_INFO_PACKET or PSN_DATA_PACKET based on additional checks if necessary
-        if some_condition:  # Replace with appropriate condition
-            packet = PSNInfoPacket(header, timestamp, version_high, version_low, frame_id, frame_packet_count)
-            print(f"PSN_INFO_PACKET received: {packet.__dict__}")
+def decode_chunk_header(data, offset):
+    chunk_type, chunk_length = struct.unpack_from('<HI', data, offset)
+    return chunk_type, chunk_length, offset + 6
+
+def decode_info_packet_header(data, offset):
+    packet_timestamp, offset = decode_uint64(data, offset)
+    version_high, offset = decode_uint8(data, offset)
+    version_low, offset = decode_uint8(data, offset)
+    frame_id, offset = decode_uint8(data, offset)
+    frame_packet_count, offset = decode_uint8(data, offset)
+    header = {
+        'packet_timestamp': packet_timestamp,
+        'version_high': version_high,
+        'version_low': version_low,
+        'frame_id': frame_id,
+        'frame_packet_count': frame_packet_count,
+    }
+    return header, offset
+
+def decode_info_system_name(data, offset, length):
+    system_name, offset = decode_char_array(data, offset, length)
+    return system_name, offset
+
+def decode_info_tracker_name(data, offset, length):
+    tracker_name, offset = decode_char_array(data, offset, length)
+    return tracker_name, offset
+
+def decode_info_tracker_list(data, offset, length):
+    end = offset + length
+    tracker_list = []
+
+    while offset < end:
+        tracker_chunk_type, tracker_chunk_length, offset = decode_chunk_header(data, offset)
+        if tracker_chunk_type == CHUNK_TYPE_INFO_TRACKER_NAME:
+            tracker_name, offset = decode_info_tracker_name(data, offset, tracker_chunk_length)
+            tracker_list.append(tracker_name)
         else:
-            packet = PSNDataPacket(header, timestamp, version_high, version_low, frame_id, frame_packet_count)
-            print(f"PSN_DATA_PACKET received: {packet.__dict__}")
-    else:
-        print(f"Unknown packet type: {hex(chunk_id)}")
-        packet = None
+            offset += tracker_chunk_length  # Skip unknown tracker chunk
 
-    return packet
+    return tracker_list, offset
 
-# Main loop to receive and process packets
+def decode_info_chunk(data, offset, length):
+    end = offset + length
+    info = {}
+
+    while offset < end:
+        chunk_type, chunk_length, offset = decode_chunk_header(data, offset)
+        if chunk_type == CHUNK_TYPE_INFO_PACKET_HEADER:
+            info_header, offset = decode_info_packet_header(data, offset)
+            info['header'] = info_header
+        elif chunk_type == CHUNK_TYPE_INFO_SYSTEM_NAME:
+            system_name, offset = decode_info_system_name(data, offset, chunk_length)
+            info['system_name'] = system_name
+        elif chunk_type == CHUNK_TYPE_INFO_TRACKER_LIST:
+            tracker_list, offset = decode_info_tracker_list(data, offset, chunk_length)
+            info['tracker_list'] = tracker_list
+        else:
+            offset += chunk_length  # Skip unknown chunk
+
+    return info, offset
+
+def decode_chunk(data, offset=0):
+    chunks = {}
+    while offset < len(data):
+        if offset + 6 > len(data):
+            break
+        chunk_type, chunk_length, offset = decode_chunk_header(data, offset)
+
+        if offset + chunk_length > len(data):
+            break
+
+        if chunk_type == CHUNK_TYPE_INFO_PACKET:
+            info, offset = decode_info_chunk(data, offset, chunk_length)
+            chunks['info'] = info
+        else:
+            print(f"Unknown chunk type: {chunk_type}, skipping...")
+            offset += chunk_length
+
+    return chunks
+
 while True:
-    data, _ = sock.recvfrom(1500)
-    packet = parse_packet(data)
-    # Further processing of the packet, logging or printing the data
+    data, addr = sock.recvfrom(BUFFER_SIZE)
+    print(f"Received packet from {addr}")
+
+    chunks = decode_chunk(data)
+    if 'info' in chunks:
+        print("Extracted Info:", chunks['info'])
