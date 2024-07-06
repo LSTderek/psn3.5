@@ -10,7 +10,7 @@ MAX_PACKET_SIZE = 1500
 
 # Configuration for logging
 LOG_TO_FILE = False
-LOG_TO_CONSOLE = True
+LOG_TO_CONSOLE = False
 DISPLAY_TRACKER_UPDATES = True
 LOG_FILE = 'psn_receiver.log'
 
