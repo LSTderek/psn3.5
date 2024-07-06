@@ -10,7 +10,7 @@ PORT = 56565
 BUFFER_SIZE = 1500
 
 # Enable or disable debug logging
-DEBUG_LOGGING = False
+DEBUG_LOGGING = True
 
 # Set up logging
 if DEBUG_LOGGING:
@@ -133,7 +133,7 @@ def parse_psn_data_packet(data):
 
                         if sub_chunk_id == 0x0000:  # PSN_DATA_TRACKER_POS
                             pos_x, pos_y, pos_z = struct.unpack_from('<fff', data, offset)
-                            tracker_info['position'] = (pos_x, pos_y, pos_z)
+                            tracker_info['position'] = (round(pos_x, 3), round(pos_y, 3), round(pos_z, 3))
                             offset += struct.calcsize('<fff')
                         else:
                             offset += sub_chunk_length
