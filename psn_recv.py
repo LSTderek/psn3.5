@@ -8,7 +8,7 @@ PORT = 56565
 MAX_PACKET_SIZE = 1500
 
 # Configuration for logging
-LOG_TO_FILE = True
+LOG_TO_FILE = False
 LOG_TO_CONSOLE = True
 LOG_FILE = 'psn_receiver.log'
 
@@ -125,6 +125,9 @@ def format_tracker_list(tracker_list):
         formatted_list.append(f"    TrackerID: {tracker_id:<5} Name: {tracker_name}")
     return "\n".join(formatted_list)
 
+# Store available trackers
+trackers = {}
+
 def start_udp_receiver():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -135,20 +138,34 @@ def start_udp_receiver():
     logger.info("Starting UDP receiver...")
     while True:
         try:
-            data, _ = sock.recvfrom(MAX_PACKET_SIZE)
+            data, addr = sock.recvfrom(MAX_PACKET_SIZE)
+            ip_address = addr[0]
             chunks = parse_chunks(data)
             for chunk_type, chunk_data in chunks:
                 if chunk_type == 'PSN_INFO_PACKET':
-                    logger.info("PSN_INFO_PACKET:")
+                    system_name = None
+                    tracker_list = []
                     for sub_chunk_type, sub_chunk_data in chunk_data:
                         if sub_chunk_type == 'PSN_INFO_PACKET_HEADER':
                             logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
                         elif sub_chunk_type == 'PSN_INFO_SYSTEM_NAME':
-                            logger.info(f"  PSN_INFO_SYSTEM_NAME: {sub_chunk_data}")
+                            system_name = sub_chunk_data
+                            logger.info(f"  PSN_INFO_SYSTEM_NAME: {system_name}")
                         elif sub_chunk_type == 'PSN_INFO_TRACKER_LIST':
-                            logger.info("  PSN_INFO_TRACKER_LIST:\n" + format_tracker_list(sub_chunk_data))
+                            tracker_list = sub_chunk_data
+                            logger.info("  PSN_INFO_TRACKER_LIST:\n" + format_tracker_list(tracker_list))
                         else:
                             logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
+
+                    # Update the trackers dictionary
+                    for tracker_id, tracker_name in tracker_list:
+                        trackers[tracker_id] = {
+                            'name': tracker_name,
+                            'system_name': system_name,
+                            'ip_address': ip_address
+                        }
+
+                    logger.info(f"Updated trackers: {trackers}")
         except Exception as e:
             logger.error(f"Error receiving data: {e}")
 
