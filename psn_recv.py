@@ -226,7 +226,10 @@ def start_udp_receiver():
                     logger.info("Received PSN_DATA_PACKET")
                     for sub_chunk_type, sub_chunk_data in chunk_data:
                         if sub_chunk_type == 'PSN_DATA_PACKET_HEADER':
-                            logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
+                            if active_frame_id is not None and sub_chunk_data.frame_id == active_frame_id:
+                                logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
+                            else:
+                                logger.info(f"  {sub_chunk_type}: {sub_chunk_data} (out of sync)")
                         else:
                             logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
         except Exception as e:
