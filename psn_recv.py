@@ -1,79 +1,97 @@
 import socket
 import struct
-from collections import namedtuple, defaultdict
 
-# Define the multicast address and port for PSN
 MULTICAST_GROUP = '236.10.10.10'
 PORT = 56565
+MAX_PACKET_SIZE = 1500
 
-# Define structures for decoding packets
-PacketHeader = namedtuple('PacketHeader', 'id length flags sequence_number timestamp')
-InfoPacket = namedtuple('InfoPacket', 'header system_name tracker_names')
+class PSNChunkHeader:
+    def __init__(self, raw_header):
+        header = struct.unpack('<I', raw_header)[0]
+        self.id = header & 0xFFFF
+        self.data_len = (header >> 16) & 0x7FFF
+        self.has_subchunks = (header >> 31) & 0x01
 
-def create_socket():
-    # Create a UDP socket
+class PSNInfoPacketHeader:
+    def __init__(self, data):
+        self.timestamp, = struct.unpack('<Q', data[:8])
+        self.version_high, = struct.unpack('<B', data[8:9])
+        self.version_low, = struct.unpack('<B', data[9:10])
+        self.frame_id, = struct.unpack('<B', data[10:11])
+        self.frame_packet_count, = struct.unpack('<B', data[11:12])
+
+class PSNDataPacketHeader:
+    def __init__(self, data):
+        self.timestamp, = struct.unpack('<Q', data[:8])
+        self.version_high, = struct.unpack('<B', data[8:9])
+        self.version_low, = struct.unpack('<B', data[9:10])
+        self.frame_id, = struct.unpack('<B', data[10:11])
+        self.frame_packet_count, = struct.unpack('<B', data[11:12])
+
+# Define other chunk classes similarly...
+
+def parse_chunks(data, offset=0):
+    chunks = []
+    while offset < len(data):
+        chunk_header = PSNChunkHeader(data[offset:offset+4])
+        offset += 4
+        chunk_data = data[offset:offset + chunk_header.data_len]
+        offset += chunk_header.data_len
+        if chunk_header.id == 0x6756:
+            chunks.append(('PSN_INFO_PACKET', parse_psn_info_packet(chunk_data)))
+        elif chunk_header.id == 0x6755:
+            chunks.append(('PSN_DATA_PACKET', parse_psn_data_packet(chunk_data)))
+        # Add more conditions for other chunk types...
+        else:
+            chunks.append(('UNKNOWN_CHUNK', chunk_data))
+    return chunks
+
+def parse_psn_info_packet(data):
+    chunks = []
+    offset = 0
+    while offset < len(data):
+        chunk_header = PSNChunkHeader(data[offset:offset+4])
+        offset += 4
+        chunk_data = data[offset:offset + chunk_header.data_len]
+        offset += chunk_header.data_len
+        if chunk_header.id == 0x0000:
+            chunks.append(('PSN_INFO_PACKET_HEADER', PSNInfoPacketHeader(chunk_data)))
+        elif chunk_header.id == 0x0001:
+            chunks.append(('PSN_INFO_SYSTEM_NAME', chunk_data.decode('utf-8')))
+        # Add more conditions for other info chunk types...
+        else:
+            chunks.append(('UNKNOWN_CHUNK', chunk_data))
+    return chunks
+
+def parse_psn_data_packet(data):
+    chunks = []
+    offset = 0
+    while offset < len(data):
+        chunk_header = PSNChunkHeader(data[offset:offset+4])
+        offset += 4
+        chunk_data = data[offset:offset + chunk_header.data_len]
+        offset += chunk_header.data_len
+        if chunk_header.id == 0x0000:
+            chunks.append(('PSN_DATA_PACKET_HEADER', PSNDataPacketHeader(chunk_data)))
+        elif chunk_header.id == 0x0001:
+            chunks.append(('PSN_DATA_TRACKER_LIST', chunk_data))
+        # Add more conditions for other data chunk types...
+        else:
+            chunks.append(('UNKNOWN_CHUNK', chunk_data))
+    return chunks
+
+def start_udp_receiver():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-    
-    # Allow multiple sockets to use the same PORT number
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    
-    # Bind to the server address
-    sock.bind(('', PORT))
-    
-    # Tell the operating system to add the socket to the multicast group on all interfaces
+    sock.bind((MULTICAST_GROUP, PORT))
     mreq = struct.pack("4sl", socket.inet_aton(MULTICAST_GROUP), socket.INADDR_ANY)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-    
-    return sock
-
-def decode_packet(data):
-    if len(data) < 14:
-        return None
-    
-    header = PacketHeader._make(struct.unpack('!HHBBQ', data[:14]))
-    
-    if header.id != 1:  # Assuming 1 is the ID for info packets
-        return None
-    
-    offset = 14
-    system_name_len = struct.unpack('!H', data[offset:offset+2])[0]
-    offset += 2
-    system_name = data[offset:offset+system_name_len].decode('utf-8')
-    offset += system_name_len
-    
-    tracker_count = struct.unpack('!H', data[offset:offset+2])[0]
-    offset += 2
-    tracker_names = {}
-    
-    for _ in range(tracker_count):
-        tracker_id = struct.unpack('!H', data[offset:offset+2])[0]
-        offset += 2
-        tracker_name_len = struct.unpack('!H', data[offset:offset+2])[0]
-        offset += 2
-        tracker_name = data[offset:offset+tracker_name_len].decode('utf-8')
-        offset += tracker_name_len
-        tracker_names[tracker_id] = tracker_name
-    
-    return InfoPacket(header, system_name, tracker_names)
-
-def listen_for_psn_packets():
-    sock = create_socket()
-    fragments = defaultdict(lambda: defaultdict(bytes))
-
-    print("Listening for PSN packets on all interfaces...")
 
     while True:
-        data, address = sock.recvfrom(1500)  # Buffer size is 1500 bytes, the maximum size for a single UDP packet
-        packet = decode_packet(data)
-        if packet:
-            print_info(packet)
-
-def print_info(info):
-    print("Received PSN Info Packet:")
-    print(f"System Name: {info.system_name}")
-    print("Tracker Names:")
-    for tracker_id, tracker_name in info.tracker_names.items():
-        print(f"  ID: {tracker_id}, Name: {tracker_name}")
+        data, _ = sock.recvfrom(MAX_PACKET_SIZE)
+        chunks = parse_chunks(data)
+        # Process chunks as needed...
+        print(chunks)
 
 if __name__ == "__main__":
-    listen_for_psn_packets()
+    start_udp_receiver()
