@@ -93,7 +93,7 @@ def start_udp_receiver():
                     elif sub_chunk_type == 'PSN_INFO_TRACKER_LIST':
                         print("  PSN_INFO_TRACKER_LIST:")
                         for tracker_id, tracker_name in sub_chunk_data:
-                            print(f"    TrackerID: {tracker_id}          Name:       {tracker_name}")
+                            print(f"    TrackerID: {tracker_id:<5} Name: {tracker_name}")
                     else:
                         print(f"  {sub_chunk_type}: {sub_chunk_data}")
 
