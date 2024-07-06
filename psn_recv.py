@@ -33,10 +33,7 @@ else:
     )
 
 # Protocol and Chunk IDs
-PSN_INFO_PACKET = 0x6756
 PSN_DATA_PACKET = 0x6755
-PSN_INFO_PACKET_HEADER = 0x0000
-PSN_INFO_TRACKER_LIST = 0x0002
 PSN_DATA_PACKET_HEADER = 0x0000
 PSN_DATA_TRACKER_LIST = 0x0001
 PSN_DATA_TRACKER_POS = 0x0000
@@ -48,53 +45,7 @@ PSN_DATA_TRACKER_TRGTPOS = 0x0005
 
 class PSNDecoder:
     def __init__(self):
-        self.tracker_names = {}
         self.packet_info = {}
-
-    def decode_info_packet(self, data):
-        offset = 0
-
-        # Extract and log the header
-        chunk_id, chunk_length = struct.unpack_from('<HH', data, offset)
-        offset += struct.calcsize('<HH')
-        logging.debug(f"PSN_INFO_PACKET_HEADER - Chunk ID: {chunk_id}, Length: {chunk_length}")
-
-        if chunk_id == PSN_INFO_PACKET_HEADER:
-            timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
-            offset += struct.calcsize('<QBBBB')
-            logging.debug(f"PSN_INFO_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
-
-        # Loop through the packet chunks
-        while offset < len(data):
-            chunk_id, chunk_length = struct.unpack_from('<HH', data, offset)
-            offset += struct.calcsize('<HH')
-            logging.debug(f"PSN_INFO Chunk - ID: {chunk_id}, Length: {chunk_length}")
-
-            if chunk_id == PSN_INFO_TRACKER_LIST:
-                end_offset = offset + chunk_length
-                while offset < end_offset:
-                    tracker_id, tracker_chunk_length = struct.unpack_from('<HH', data, offset)
-                    offset += struct.calcsize('<HH')
-                    tracker_data_offset = offset
-                    logging.debug(f"PSN_INFO Tracker - ID: {tracker_id}, Chunk Length: {tracker_chunk_length}")
-
-                    tracker_info = {}
-                    while offset < tracker_data_offset + tracker_chunk_length:
-                        sub_chunk_id, sub_chunk_length = struct.unpack_from('<HH', data, offset)
-                        offset += struct.calcsize('<HH')
-                        logging.debug(f"PSN_INFO Tracker Sub-Chunk - ID: {sub_chunk_id}, Length: {sub_chunk_length}")
-
-                        if sub_chunk_id == 0x0000:  # PSN_INFO_TRACKER_NAME
-                            tracker_name = struct.unpack_from(f'<{sub_chunk_length}s', data, offset)[0].decode('utf-8').strip('\x00')
-                            tracker_info['name'] = tracker_name
-                            offset += sub_chunk_length
-                        else:
-                            offset += sub_chunk_length
-
-                    self.tracker_names[tracker_id] = tracker_info['name']
-                    logging.debug(f"Tracker ID: {tracker_id}, Name: {tracker_info.get('name', 'Unknown')}")
-            else:
-                offset += chunk_length
 
     def decode_data_packet(self, data):
         offset = 0
@@ -107,7 +58,7 @@ class PSNDecoder:
         if chunk_id == PSN_DATA_PACKET_HEADER:
             timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
             offset += struct.calcsize('<QBBBB')
-            logging.debug(f"PSN_DATA_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version.low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
+            logging.debug(f"PSN_DATA_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
 
         # Loop through the packet chunks
         while offset < len(data):
@@ -143,34 +94,38 @@ class PSNDecoder:
 
                         if sub_chunk_id == PSN_DATA_TRACKER_POS and remaining_buffer_size >= struct.calcsize('<fff'):
                             pos_x, pos_y, pos_z = struct.unpack_from('<fff', data, offset)
-                            tracker_info['position'] = (pos_x, pos_y, pos_z)
+                            tracker_info['pos_x'] = pos_x
+                            tracker_info['pos_y'] = pos_y
+                            tracker_info['pos_z'] = pos_z
                             offset += struct.calcsize('<fff')
-                            logging.debug(f"Position - X: {pos_x}, Y: {pos_y}, Z: {pos_z}")
                         elif sub_chunk_id == PSN_DATA_TRACKER_SPEED and remaining_buffer_size >= struct.calcsize('<fff'):
                             speed_x, speed_y, speed_z = struct.unpack_from('<fff', data, offset)
-                            tracker_info['speed'] = (speed_x, speed_y, speed_z)
+                            tracker_info['spd_x'] = speed_x
+                            tracker_info['spd_y'] = speed_y
+                            tracker_info['spd_z'] = speed_z
                             offset += struct.calcsize('<fff')
-                            logging.debug(f"Speed - X: {speed_x}, Y: {speed_y}, Z: {speed_z}")
                         elif sub_chunk_id == PSN_DATA_TRACKER_ORI and remaining_buffer_size >= struct.calcsize('<fff'):
                             ori_x, ori_y, ori_z = struct.unpack_from('<fff', data, offset)
-                            tracker_info['orientation'] = (ori_x, ori_y, ori_z)
+                            tracker_info['ori_x'] = ori_x
+                            tracker_info['ori_y'] = ori_y
+                            tracker_info['ori_z'] = ori_z
                             offset += struct.calcsize('<fff')
-                            logging.debug(f"Orientation - X: {ori_x}, Y: {ori_y}, Z: {ori_z}")
                         elif sub_chunk_id == PSN_DATA_TRACKER_STATUS and remaining_buffer_size >= struct.calcsize('<I'):
                             status = struct.unpack_from('<I', data, offset)[0]
                             tracker_info['status'] = status
                             offset += struct.calcsize('<I')
-                            logging.debug(f"Status: {status}")
                         elif sub_chunk_id == PSN_DATA_TRACKER_ACCEL and remaining_buffer_size >= struct.calcsize('<fff'):
                             accel_x, accel_y, accel_z = struct.unpack_from('<fff', data, offset)
-                            tracker_info['acceleration'] = (accel_x, accel_y, accel_z)
+                            tracker_info['accel_x'] = accel_x
+                            tracker_info['accel_y'] = accel_y
+                            tracker_info['accel_z'] = accel_z
                             offset += struct.calcsize('<fff')
-                            logging.debug(f"Acceleration - X: {accel_x}, Y: {accel_y}, Z: {accel_z}")
                         elif sub_chunk_id == PSN_DATA_TRACKER_TRGTPOS and remaining_buffer_size >= struct.calcsize('<fff'):
                             trgtpos_x, trgtpos_y, trgtpos_z = struct.unpack_from('<fff', data, offset)
-                            tracker_info['target_position'] = (trgtpos_x, trgtpos_y, trgtpos_z)
+                            tracker_info['trgtpos_x'] = trgtpos_x
+                            tracker_info['trgtpos_y'] = trgtpos_y
+                            tracker_info['trgtpos_z'] = trgtpos_z
                             offset += struct.calcsize('<fff')
-                            logging.debug(f"Target Position - X: {trgtpos_x}, Y: {trgtpos_y}, Z: {trgtpos_z}")
                         else:
                             offset += sub_chunk_length
 
@@ -183,13 +138,9 @@ class PSNDecoder:
 
     def get_tracker_info(self):
         for tracker_id, tracker_data in self.packet_info.items():
-            if tracker_id in self.tracker_names:
-                name = self.tracker_names[tracker_id]
-                position = tracker_data.get('position', None)
-                if position:
-                    print(f'TrackerID: "{tracker_id}"')
-                    print(f'TrackerName: "{name}"')
-                    print(f'Pos: "{position[0]}, {position[1]}, {position[2]}"')
+            print(f'TrackerID: "{tracker_id}"')
+            for key, value in tracker_data.items():
+                print(f'{key}: {value}')
 
 def main():
     # Create UDP socket
@@ -211,10 +162,7 @@ def main():
             logging.debug(f"Raw data received: {data.hex()}")
             if len(data) > 4:
                 header_id = struct.unpack_from('<H', data, 0)[0]
-                if header_id == PSN_INFO_PACKET:
-                    logging.debug("Received PSN_INFO packet")
-                    decoder.decode_info_packet(data)
-                elif header_id == PSN_DATA_PACKET:
+                if header_id == PSN_DATA_PACKET:
                     logging.debug("Received PSN_DATA packet")
                     decoder.decode_data_packet(data)
                     decoder.get_tracker_info()
