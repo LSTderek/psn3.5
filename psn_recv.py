@@ -72,6 +72,12 @@ def parse_psn_info_tracker_list(data):
         chunks.append((tracker_id, tracker_name))
     return chunks
 
+def format_tracker_list(tracker_list):
+    formatted_list = []
+    for tracker_id, tracker_name in tracker_list:
+        formatted_list.append(f"    TrackerID: {tracker_id:<5} Name: {tracker_name}")
+    return "\n".join(formatted_list)
+
 def start_udp_receiver():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -92,8 +98,7 @@ def start_udp_receiver():
                         print(f"  PSN_INFO_SYSTEM_NAME: {sub_chunk_data}")
                     elif sub_chunk_type == 'PSN_INFO_TRACKER_LIST':
                         print("  PSN_INFO_TRACKER_LIST:")
-                        for tracker_id, tracker_name in sub_chunk_data:
-                            print(f"    TrackerID: {tracker_id:<5} Name: {tracker_name}")
+                        print(format_tracker_list(sub_chunk_data))
                     else:
                         print(f"  {sub_chunk_type}: {sub_chunk_data}")
 
