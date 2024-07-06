@@ -62,7 +62,7 @@ class PSNDecoder:
         if chunk_id == PSN_INFO_PACKET_HEADER:
             timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
             offset += struct.calcsize('<QBBBB')
-            logging.debug(f"PSN_INFO_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version.low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
+            logging.debug(f"PSN_INFO_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
 
         # Loop through the packet chunks
         while offset < len(data):
@@ -129,32 +129,38 @@ class PSNDecoder:
                         offset += struct.calcsize('<HH')
                         logging.debug(f"PSN_DATA Tracker Sub-Chunk - ID: {sub_chunk_id}, Length: {sub_chunk_length}")
 
-                        if sub_chunk_id == PSN_DATA_TRACKER_POS:
+                        # Check if buffer size is sufficient before unpacking
+                        remaining_buffer_size = len(data) - offset
+                        if remaining_buffer_size < sub_chunk_length:
+                            logging.warning(f"Buffer too small for sub-chunk. Expected: {sub_chunk_length}, Remaining: {remaining_buffer_size}")
+                            break
+
+                        if sub_chunk_id == PSN_DATA_TRACKER_POS and remaining_buffer_size >= struct.calcsize('<fff'):
                             pos_x, pos_y, pos_z = struct.unpack_from('<fff', data, offset)
                             tracker_info['position'] = (pos_x, pos_y, pos_z)
                             offset += struct.calcsize('<fff')
                             logging.debug(f"Position - X: {pos_x}, Y: {pos_y}, Z: {pos_z}")
-                        elif sub_chunk_id == PSN_DATA_TRACKER_SPEED:
+                        elif sub_chunk_id == PSN_DATA_TRACKER_SPEED and remaining_buffer_size >= struct.calcsize('<fff'):
                             speed_x, speed_y, speed_z = struct.unpack_from('<fff', data, offset)
                             tracker_info['speed'] = (speed_x, speed_y, speed_z)
                             offset += struct.calcsize('<fff')
                             logging.debug(f"Speed - X: {speed_x}, Y: {speed_y}, Z: {speed_z}")
-                        elif sub_chunk_id == PSN_DATA_TRACKER_ORI:
+                        elif sub_chunk_id == PSN_DATA_TRACKER_ORI and remaining_buffer_size >= struct.calcsize('<fff'):
                             ori_x, ori_y, ori_z = struct.unpack_from('<fff', data, offset)
                             tracker_info['orientation'] = (ori_x, ori_y, ori_z)
                             offset += struct.calcsize('<fff')
                             logging.debug(f"Orientation - X: {ori_x}, Y: {ori_y}, Z: {ori_z}")
-                        elif sub_chunk_id == PSN_DATA_TRACKER_STATUS:
+                        elif sub_chunk_id == PSN_DATA_TRACKER_STATUS and remaining_buffer_size >= struct.calcsize('<I'):
                             status = struct.unpack_from('<I', data, offset)[0]
                             tracker_info['status'] = status
                             offset += struct.calcsize('<I')
                             logging.debug(f"Status: {status}")
-                        elif sub_chunk_id == PSN_DATA_TRACKER_ACCEL:
+                        elif sub_chunk_id == PSN_DATA_TRACKER_ACCEL and remaining_buffer_size >= struct.calcsize('<fff'):
                             accel_x, accel_y, accel_z = struct.unpack_from('<fff', data, offset)
                             tracker_info['acceleration'] = (accel_x, accel_y, accel_z)
                             offset += struct.calcsize('<fff')
                             logging.debug(f"Acceleration - X: {accel_x}, Y: {accel_y}, Z: {accel_z}")
-                        elif sub_chunk_id == PSN_DATA_TRACKER_TRGTPOS:
+                        elif sub_chunk_id == PSN_DATA_TRACKER_TRGTPOS and remaining_buffer_size >= struct.calcsize('<fff'):
                             trgtpos_x, trgtpos_y, trgtpos_z = struct.unpack_from('<fff', data, offset)
                             tracker_info['target_position'] = (trgtpos_x, trgtpos_y, trgtpos_z)
                             offset += struct.calcsize('<fff')
