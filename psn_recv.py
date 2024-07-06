@@ -155,6 +155,7 @@ def main():
     try:
         while True:
             data, _ = sock.recvfrom(BUFFER_SIZE)
+            print(f"Raw data: {data.hex()}")
             if len(data) > 4:
                 header_id = struct.unpack_from('<H', data, 0)[0]
                 if header_id == PSN_INFO_PACKET:
@@ -180,3 +181,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
