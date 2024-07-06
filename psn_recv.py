@@ -66,27 +66,6 @@ class PSNInfoPacketHeader:
                 f"Version Low: {self.version_low}, Frame ID: {self.frame_id}, "
                 f"Frame Packet Count: {self.frame_packet_count}")
 
-class PSNDataPacketHeader:
-    def __init__(self, data):
-        try:
-            self.timestamp, = struct.unpack('<Q', data[:8])
-            self.version_high, = struct.unpack('<B', data[8:9])
-            self.version_low, = struct.unpack('<B', data[9:10])
-            self.frame_id, = struct.unpack('<B', data[10:11])
-            self.frame_packet_count, = struct.unpack('<B', data[11:12])
-        except struct.error as e:
-            logger.error(f"Failed to unpack PSNDataPacketHeader: {e}")
-            self.timestamp = 0
-            self.version_high = 0
-            self.version_low = 0
-            self.frame_id = 0
-            self.frame_packet_count = 0
-
-    def __str__(self):
-        return (f"Timestamp: {self.timestamp}, Version High: {self.version_high}, "
-                f"Version Low: {self.version_low}, Frame ID: {self.frame_id}, "
-                f"Frame Packet Count: {self.frame_packet_count}")
-
 def parse_chunks(data, offset=0):
     chunks = []
     while offset < len(data):
@@ -97,16 +76,30 @@ def parse_chunks(data, offset=0):
             offset += chunk_header.data_len
             if chunk_header.id == 0x6756:
                 chunks.append(('PSN_INFO_PACKET', parse_psn_info_packet(chunk_data)))
-            elif chunk_header.id == 0x6765:
-                chunks.append(('PSN_DATA_PACKET', parse_psn_data_packet(chunk_data)))
             elif chunk_header.id == 26453:  # Handle specific chunk ID 26453
-                chunks.append(('SPECIFIC_CHUNK_26453', chunk_data))
+                chunks.append(('SPECIFIC_CHUNK_26453', parse_specific_chunk_26453(chunk_data)))
             else:
                 logger.debug(f"Ignoring unknown chunk ID: {chunk_header.id}")
         except Exception as e:
             logger.error(f"Error parsing chunk: {e}")
             break
     return chunks
+
+def parse_specific_chunk_26453(data):
+    try:
+        timestamp, unknown1, unknown2, frame_id, tracker_id, unknown3 = struct.unpack('<IHHBBH', data[:12])
+        chunk_data = {
+            'timestamp': timestamp,
+            'unknown1': unknown1,
+            'unknown2': unknown2,
+            'frame_id': frame_id,
+            'tracker_id': tracker_id,
+            'unknown3': unknown3
+        }
+        return chunk_data
+    except struct.error as e:
+        logger.error(f"Failed to unpack specific chunk 26453: {e}")
+        return {}
 
 def parse_psn_info_packet(data):
     chunks = []
@@ -130,27 +123,6 @@ def parse_psn_info_packet(data):
             break
     return chunks
 
-def parse_psn_data_packet(data):
-    chunks = []
-    offset = 0
-    while offset < len(data):
-        try:
-            chunk_header = PSNChunkHeader(data[offset:offset+4])
-            offset += 4
-            chunk_data = data[offset:offset + chunk_header.data_len]
-            offset += chunk_header.data_len
-            if chunk_header.id == 0x0000:
-                chunks.append(('PSN_DATA_PACKET_HEADER', PSNDataPacketHeader(chunk_data)))
-            elif chunk_header.id >= 0x0001:
-                tracker_name = find_tracker_name_by_id(chunk_header.id)
-                chunks.append((tracker_name, parse_psn_data_tracker(chunk_data)))
-            else:
-                chunks.append(('UNKNOWN_CHUNK', chunk_data))
-        except Exception as e:
-            logger.error(f"Error parsing PSN data packet: {e}")
-            break
-    return chunks
-
 def parse_psn_info_tracker_list(data):
     chunks = []
     offset = 0
@@ -168,41 +140,20 @@ def parse_psn_info_tracker_list(data):
             break
     return chunks
 
-def parse_psn_data_tracker(data):
-    pos_x, pos_y, pos_z = struct.unpack('<fff', data[:12])
-    speed_x, speed_y, speed_z = struct.unpack('<fff', data[12:24])
-    ori_x, ori_y, ori_z = struct.unpack('<fff', data[24:36])
-    accel_x, accel_y, accel_z = struct.unpack('<fff', data[36:48])
-    trgtpos_x, trgtpos_y, trgtpos_z = struct.unpack('<fff', data[48:60])
-    tracker_timestamp, = struct.unpack('<Q', data[60:68])
-    return {
-        'pos': (pos_x, pos_y, pos_z),
-        'speed': (speed_x, speed_y, speed_z),
-        'ori': (ori_x, ori_y, ori_z),
-        'accel': (accel_x, accel_y, accel_z),
-        'trgtpos': (trgtpos_x, trgtpos_y, trgtpos_z),
-        'tracker_timestamp': tracker_timestamp
-    }
-
-def find_tracker_name_by_id(tracker_id):
-    for name, details in trackers.items():
-        if details['id'] == tracker_id:
-            return name
-    return 'UNKNOWN_TRACKER'
-
 def format_tracker_list(tracker_list):
     formatted_list = []
     for tracker_name, tracker_id in tracker_list:
-        formatted_list.append(f"    TrackerID: {tracker_id:<5} Name: {tracker_name}")
-    return "\n".join(formatted_list)
-
-# Store available trackers
-trackers = {}
+        formatted_list.append(f"    TrackerID: {tracker_id}     Name: {tracker_name}")
+    return '\n'.join(formatted_list)
 
 def start_udp_receiver():
+    global trackers
+    trackers = {}
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind((MULTICAST_GROUP, PORT))
+    sock.bind(('', PORT))
+
     mreq = struct.pack("4sl", socket.inet_aton(MULTICAST_GROUP), socket.INADDR_ANY)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
@@ -240,16 +191,7 @@ def start_udp_receiver():
                     if DISPLAY_TRACKER_UPDATES:
                         print(f"Updated trackers: {trackers}")
 
-                elif chunk_type == 'PSN_DATA_PACKET':
-                    logger.info("PSN_DATA_PACKET:")
-                    for sub_chunk_type, sub_chunk_data in chunk_data:
-                        if sub_chunk_type == 'PSN_DATA_PACKET_HEADER':
-                            logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
-                        else:
-                            logger.info(f"  Tracker: {sub_chunk_type}, Data: {sub_chunk_data}")
-
                 elif chunk_type == 'SPECIFIC_CHUNK_26453':
-                    # Handle the specific chunk ID 26453 here
                     logger.info(f"Received specific chunk 26453: {chunk_data}")
                 else:
                     logger.debug(f"Ignoring unknown chunk ID: {chunk_type}")
