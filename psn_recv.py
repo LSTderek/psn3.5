@@ -27,15 +27,15 @@ def create_socket():
     return sock
 
 def decode_packet(data):
-    if len(data) < 16:
+    if len(data) < 14:
         return None
     
-    header = PacketHeader._make(struct.unpack('!HHBBQ', data[:16]))
+    header = PacketHeader._make(struct.unpack('!HHBBQ', data[:14]))
     
     if header.id != 1:  # Assuming 1 is the ID for info packets
         return None
     
-    offset = 16
+    offset = 14
     system_name_len = struct.unpack('!H', data[offset:offset+2])[0]
     offset += 2
     system_name = data[offset:offset+system_name_len].decode('utf-8')
