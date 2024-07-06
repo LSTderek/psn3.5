@@ -23,11 +23,11 @@ def parse_psn_info_packet(data):
     """
     Parses a PSN_INFO packet and returns tracker names.
     """
-    try:
-        packet_info = {}
-        offset = 0
+    packet_info = {}
+    offset = 0
 
-        # Extract header
+    # Extract header
+    try:
         timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
         offset += struct.calcsize('<QBBBB')
 
@@ -51,7 +51,7 @@ def parse_psn_info_packet(data):
                         if sub_chunk_id == 0x0000:  # PSN_INFO_TRACKER_NAME
                             tracker_name = struct.unpack_from(f'<{sub_chunk_length}s', data, offset)[0].decode('utf-8')
                             tracker_info['name'] = tracker_name
-                            offset += struct.calcsize(f'<{sub_chunk_length}s')
+                            offset += sub_chunk_length
                         else:
                             offset += sub_chunk_length
 
@@ -59,20 +59,20 @@ def parse_psn_info_packet(data):
             else:
                 offset += chunk_length
 
-        return packet_info
     except struct.error as e:
         logging.error(f"Error parsing PSN_INFO packet: {e}")
-        return {}
+
+    return packet_info
 
 def parse_psn_data_packet(data):
     """
     Parses a PSN_DATA packet and returns tracker positions.
     """
-    try:
-        packet_info = {}
-        offset = 0
+    packet_info = {}
+    offset = 0
 
-        # Extract header
+    # Extract header
+    try:
         timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
         offset += struct.calcsize('<QBBBB')
 
@@ -104,10 +104,10 @@ def parse_psn_data_packet(data):
             else:
                 offset += chunk_length
 
-        return packet_info
     except struct.error as e:
         logging.error(f"Error parsing PSN_DATA packet: {e}")
-        return {}
+
+    return packet_info
 
 def main():
     # Create UDP socket
@@ -139,7 +139,7 @@ def main():
                         if tracker_id.startswith('tracker_'):
                             tracker_id_num = tracker_id.split('_')[1]
                             position = tracker_data.get('position', None)
-                            name = tracker_names.get(tracker_id, {}).get('name', 'Unknown')
+                            name = tracker_names.get(f'tracker_{tracker_id_num}', {}).get('name', 'Unknown')
                             if position:
                                 print(f'TrackerID: "{tracker_id_num}"')
                                 print(f'TrackerName: "{name}"')
