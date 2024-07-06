@@ -9,8 +9,15 @@ PORT = 56565
 # Buffer size for UDP packet
 BUFFER_SIZE = 1500
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging to output to a file
+logging.basicConfig(
+    level=logging.DEBUG, 
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("psn_data.log"),
+        logging.StreamHandler()
+    ]
+)
 
 def parse_psn_data_packet(data):
     """
@@ -65,7 +72,7 @@ def main():
     # Create UDP socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind((MULTICAST_GROUP, PORT))
+    sock.bind(('', PORT))  # Bind to all interfaces
 
     # Join multicast group
     mreq = struct.pack('4sl', socket.inet_aton(MULTICAST_GROUP), socket.INADDR_ANY)
@@ -76,6 +83,7 @@ def main():
     try:
         while True:
             data, _ = sock.recvfrom(BUFFER_SIZE)
+            logging.debug(f"Received data: {data}")
             packet_info = parse_psn_data_packet(data)
             
             for tracker_id, tracker_data in packet_info.items():
