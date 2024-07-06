@@ -58,6 +58,7 @@ def main():
     try:
         while True:
             data, _ = sock.recvfrom(BUFFER_SIZE)
+            print("Packet received:")
             parse_psn_info_packet(data)
     except KeyboardInterrupt:
         print("Exiting...")
@@ -66,3 +67,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
