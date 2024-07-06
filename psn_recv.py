@@ -27,15 +27,6 @@ def parse_psn_data_packet(data):
     offset = 0
 
     try:
-        # Extract header
-        chunk_id, data_field = struct.unpack_from('<HH', data, offset)
-        offset += struct.calcsize('<HH')
-        logging.debug(f"PSN_DATA Header - Chunk ID: {chunk_id}, Data Field: {data_field}")
-
-        if chunk_id != 0x6755:  # Ensure it's a PSN_DATA packet
-            logging.error("Received packet is not PSN_DATA_PACKET")
-            return packet_info
-
         # Extract PSN_DATA_PACKET_HEADER
         chunk_id, chunk_length = struct.unpack_from('<HH', data, offset)
         offset += struct.calcsize('<HH')
@@ -91,15 +82,6 @@ def parse_psn_info_packet(data):
     offset = 0
 
     try:
-        # Extract header
-        chunk_id, data_field = struct.unpack_from('<HH', data, offset)
-        offset += struct.calcsize('<HH')
-        logging.debug(f"PSN_INFO Header - Chunk ID: {chunk_id}, Data Field: {data_field}")
-
-        if chunk_id != 0x6756:  # Ensure it's a PSN_INFO packet
-            logging.error("Received packet is not PSN_INFO_PACKET")
-            return packet_info
-
         # Extract PSN_INFO_PACKET_HEADER
         chunk_id, chunk_length = struct.unpack_from('<HH', data, offset)
         offset += struct.calcsize('<HH')
