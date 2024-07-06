@@ -36,15 +36,18 @@ def parse_psn_info_packet(data):
             print(f"Frame ID: {frame_id}")
             print(f"Frame Packet Count: {frame_packet_count}")
         elif chunk_id == 0x0001:  # PSN_INFO_SYSTEM_NAME
-            system_name = chunk_data.decode('utf-8')
+            system_name = chunk_data.decode('utf-8').strip('\x00')
             print(f"System Name: {system_name}")
         elif chunk_id == 0x0002:  # PSN_INFO_TRACKER_LIST
-            tracker_offset = 0
-            while tracker_offset < len(chunk_data):
-                tracker_id, tracker_chunk_data, tracker_has_subchunks, tracker_offset = parse_chunk(chunk_data, tracker_offset)
-                if tracker_id == 0x0000:  # PSN_INFO_TRACKER_NAME
-                    tracker_name = tracker_chunk_data.decode('utf-8')
-                    print(f"Tracker Name: {tracker_name}")
+            parse_tracker_list(chunk_data)
+
+def parse_tracker_list(data):
+    offset = 0
+    while offset < len(data):
+        tracker_id, tracker_chunk_data, tracker_has_subchunks, offset = parse_chunk(data, offset)
+        if tracker_id == 0x0000:  # PSN_INFO_TRACKER_NAME
+            tracker_name = tracker_chunk_data.decode('utf-8').strip('\x00')
+            print(f"Tracker Name: {tracker_name}")
 
 def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
