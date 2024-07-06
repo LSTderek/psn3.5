@@ -40,6 +40,11 @@ PSN_INFO_TRACKER_LIST = 0x0002
 PSN_DATA_PACKET_HEADER = 0x0000
 PSN_DATA_TRACKER_LIST = 0x0001
 PSN_DATA_TRACKER_POS = 0x0000
+PSN_DATA_TRACKER_SPEED = 0x0001
+PSN_DATA_TRACKER_ORI = 0x0002
+PSN_DATA_TRACKER_STATUS = 0x0003
+PSN_DATA_TRACKER_ACCEL = 0x0004
+PSN_DATA_TRACKER_TRGTPOS = 0x0005
 
 class PSNDecoder:
     def __init__(self):
@@ -57,7 +62,7 @@ class PSNDecoder:
         if chunk_id == PSN_INFO_PACKET_HEADER:
             timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
             offset += struct.calcsize('<QBBBB')
-            logging.debug(f"PSN_INFO_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
+            logging.debug(f"PSN_INFO_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version.low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
 
         # Loop through the packet chunks
         while offset < len(data):
@@ -124,21 +129,43 @@ class PSNDecoder:
                         offset += struct.calcsize('<HH')
                         logging.debug(f"PSN_DATA Tracker Sub-Chunk - ID: {sub_chunk_id}, Length: {sub_chunk_length}")
 
-                        # Log the raw sub-chunk data for analysis
-                        sub_chunk_data = data[offset:offset + sub_chunk_length]
-                        logging.debug(f"Raw Sub-Chunk Data: {sub_chunk_data.hex()}")
-
                         if sub_chunk_id == PSN_DATA_TRACKER_POS:
                             pos_x, pos_y, pos_z = struct.unpack_from('<fff', data, offset)
                             tracker_info['position'] = (pos_x, pos_y, pos_z)
                             offset += struct.calcsize('<fff')
+                            logging.debug(f"Position - X: {pos_x}, Y: {pos_y}, Z: {pos_z}")
+                        elif sub_chunk_id == PSN_DATA_TRACKER_SPEED:
+                            speed_x, speed_y, speed_z = struct.unpack_from('<fff', data, offset)
+                            tracker_info['speed'] = (speed_x, speed_y, speed_z)
+                            offset += struct.calcsize('<fff')
+                            logging.debug(f"Speed - X: {speed_x}, Y: {speed_y}, Z: {speed_z}")
+                        elif sub_chunk_id == PSN_DATA_TRACKER_ORI:
+                            ori_x, ori_y, ori_z = struct.unpack_from('<fff', data, offset)
+                            tracker_info['orientation'] = (ori_x, ori_y, ori_z)
+                            offset += struct.calcsize('<fff')
+                            logging.debug(f"Orientation - X: {ori_x}, Y: {ori_y}, Z: {ori_z}")
+                        elif sub_chunk_id == PSN_DATA_TRACKER_STATUS:
+                            status = struct.unpack_from('<I', data, offset)[0]
+                            tracker_info['status'] = status
+                            offset += struct.calcsize('<I')
+                            logging.debug(f"Status: {status}")
+                        elif sub_chunk_id == PSN_DATA_TRACKER_ACCEL:
+                            accel_x, accel_y, accel_z = struct.unpack_from('<fff', data, offset)
+                            tracker_info['acceleration'] = (accel_x, accel_y, accel_z)
+                            offset += struct.calcsize('<fff')
+                            logging.debug(f"Acceleration - X: {accel_x}, Y: {accel_y}, Z: {accel_z}")
+                        elif sub_chunk_id == PSN_DATA_TRACKER_TRGTPOS:
+                            trgtpos_x, trgtpos_y, trgtpos_z = struct.unpack_from('<fff', data, offset)
+                            tracker_info['target_position'] = (trgtpos_x, trgtpos_y, trgtpos_z)
+                            offset += struct.calcsize('<fff')
+                            logging.debug(f"Target Position - X: {trgtpos_x}, Y: {trgtpos_y}, Z: {trgtpos_z}")
                         else:
                             offset += sub_chunk_length
 
                     if tracker_id in self.packet_info:
                         logging.debug(f"Duplicate Tracker ID found: {tracker_id}, overwriting previous data")
                     self.packet_info[tracker_id] = tracker_info
-                    logging.debug(f"Tracker ID: {tracker_id}, Position: {tracker_info.get('position', 'Unknown')}")
+                    logging.debug(f"Tracker ID: {tracker_id}, Data: {tracker_info}")
             else:
                 offset += chunk_length
 
