@@ -67,11 +67,8 @@ def parse_psn_info_tracker_list(data):
         offset += 4
         chunk_data = data[offset:offset + chunk_header.data_len]
         offset += chunk_header.data_len
-        if chunk_header.id == 0x0000:
-            tracker_name = chunk_data[4:].decode('utf-8')  # Skip first 4 bytes for the header
-            chunks.append(('PSN_INFO_TRACKER_NAME', tracker_name))
-        else:
-            chunks.append(('UNKNOWN_CHUNK', chunk_data))
+        tracker_name = chunk_data.decode('utf-8')
+        chunks.append(('PSN_INFO_TRACKER_NAME', tracker_name))
     return chunks
 
 def start_udp_receiver():
