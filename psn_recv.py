@@ -68,7 +68,7 @@ def parse_psn_info_tracker_list(data):
         chunk_data = data[offset:offset + chunk_header.data_len]
         offset += chunk_header.data_len
         tracker_id = chunk_header.id
-        tracker_name = chunk_data.decode('utf-8').strip()
+        tracker_name = chunk_data.decode('utf-8').strip().replace('\n', ' ')
         chunks.append((tracker_id, tracker_name))
     return chunks
 
