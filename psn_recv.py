@@ -76,30 +76,11 @@ def parse_chunks(data, offset=0):
             offset += chunk_header.data_len
             if chunk_header.id == 0x6756:
                 chunks.append(('PSN_INFO_PACKET', parse_psn_info_packet(chunk_data)))
-            elif chunk_header.id == 26453:  # Handle specific chunk ID 26453
-                chunks.append(('SPECIFIC_CHUNK_26453', parse_specific_chunk_26453(chunk_data)))
-            else:
-                logger.debug(f"Ignoring unknown chunk ID: {chunk_header.id}")
+            # Ignore other chunk types for now...
         except Exception as e:
             logger.error(f"Error parsing chunk: {e}")
             break
     return chunks
-
-def parse_specific_chunk_26453(data):
-    try:
-        timestamp, unknown1, unknown2, frame_id, tracker_id, unknown3 = struct.unpack('<IHHBBH', data[:12])
-        chunk_data = {
-            'timestamp': timestamp,
-            'unknown1': unknown1,
-            'unknown2': unknown2,
-            'frame_id': frame_id,
-            'tracker_id': tracker_id,
-            'unknown3': unknown3
-        }
-        return chunk_data
-    except struct.error as e:
-        logger.error(f"Failed to unpack specific chunk 26453: {e}")
-        return {}
 
 def parse_psn_info_packet(data):
     chunks = []
@@ -143,17 +124,16 @@ def parse_psn_info_tracker_list(data):
 def format_tracker_list(tracker_list):
     formatted_list = []
     for tracker_name, tracker_id in tracker_list:
-        formatted_list.append(f"    TrackerID: {tracker_id}     Name: {tracker_name}")
-    return '\n'.join(formatted_list)
+        formatted_list.append(f"    TrackerID: {tracker_id:<5} Name: {tracker_name}")
+    return "\n".join(formatted_list)
+
+# Store available trackers
+trackers = {}
 
 def start_udp_receiver():
-    global trackers
-    trackers = {}
-
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(('', PORT))
-
+    sock.bind((MULTICAST_GROUP, PORT))
     mreq = struct.pack("4sl", socket.inet_aton(MULTICAST_GROUP), socket.INADDR_ANY)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
@@ -162,8 +142,6 @@ def start_udp_receiver():
         try:
             data, addr = sock.recvfrom(MAX_PACKET_SIZE)
             ip_address = addr[0]
-            logger.debug(f"Received packet from {ip_address}")
-
             chunks = parse_chunks(data)
             for chunk_type, chunk_data in chunks:
                 if chunk_type == 'PSN_INFO_PACKET':
@@ -181,6 +159,7 @@ def start_udp_receiver():
                         else:
                             logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
 
+                    # Update the trackers dictionary
                     for tracker_name, tracker_id in tracker_list:
                         trackers[tracker_name] = {
                             'id': tracker_id,
@@ -190,11 +169,6 @@ def start_udp_receiver():
 
                     if DISPLAY_TRACKER_UPDATES:
                         print(f"Updated trackers: {trackers}")
-
-                elif chunk_type == 'SPECIFIC_CHUNK_26453':
-                    logger.info(f"Received specific chunk 26453: {chunk_data}")
-                else:
-                    logger.debug(f"Ignoring unknown chunk ID: {chunk_type}")
         except Exception as e:
             logger.error(f"Error receiving data: {e}")
 
