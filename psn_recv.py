@@ -17,7 +17,7 @@ LOG_FILE = 'psn_receiver.log'
 # Set up logging
 logger = logging.getLogger('PSNReceiver')
 logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levellevel)s - %(message)s')
 
 if LOG_TO_FILE:
     file_handler = RotatingFileHandler(LOG_FILE, maxBytes=1024*1024, backupCount=5)
