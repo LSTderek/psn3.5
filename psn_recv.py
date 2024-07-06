@@ -41,9 +41,6 @@ PSN_DATA_PACKET_HEADER = 0x0000
 PSN_DATA_TRACKER_LIST = 0x0001
 PSN_DATA_TRACKER_POS = 0x0000
 
-tracker_names = {}
-tracker_count = 0
-
 class PSNDecoder:
     def __init__(self):
         self.tracker_names = {}
@@ -60,7 +57,7 @@ class PSNDecoder:
         if chunk_id == PSN_INFO_PACKET_HEADER:
             timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
             offset += struct.calcsize('<QBBBB')
-            logging.debug(f"PSN_INFO_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
+            logging.debug(f"PSN_INFO_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version.low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
 
         # Loop through the packet chunks
         while offset < len(data):
@@ -105,7 +102,7 @@ class PSNDecoder:
         if chunk_id == PSN_DATA_PACKET_HEADER:
             timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
             offset += struct.calcsize('<QBBBB')
-            logging.debug(f"PSN_DATA_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
+            logging.debug(f"PSN_DATA_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version.low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
 
         # Loop through the packet chunks
         while offset < len(data):
