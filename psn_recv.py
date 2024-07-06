@@ -19,56 +19,6 @@ logging.basicConfig(
     ]
 )
 
-def parse_psn_info_packet(data):
-    """
-    Parses a PSN_INFO packet and returns tracker names.
-    """
-    packet_info = {}
-    offset = 0
-
-    try:
-        # Extract header
-        timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
-        offset += struct.calcsize('<QBBBB')
-        logging.debug(f"PSN_INFO Header - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
-
-        # Loop through the packet chunks
-        while offset < len(data):
-            chunk_id, chunk_length = struct.unpack_from('<HH', data, offset)
-            offset += struct.calcsize('<HH')
-            logging.debug(f"PSN_INFO Chunk - ID: {chunk_id}, Length: {chunk_length}")
-
-            if chunk_id == 0x0002:  # PSN_INFO_TRACKER_LIST
-                end_offset = offset + chunk_length
-                while offset < end_offset:
-                    tracker_id, tracker_chunk_length = struct.unpack_from('<HH', data, offset)
-                    offset += struct.calcsize('<HH')
-                    tracker_data_offset = offset
-                    logging.debug(f"PSN_INFO Tracker - ID: {tracker_id}, Chunk Length: {tracker_chunk_length}")
-
-                    tracker_info = {}
-                    while offset < tracker_data_offset + tracker_chunk_length:
-                        sub_chunk_id, sub_chunk_length = struct.unpack_from('<HH', data, offset)
-                        offset += struct.calcsize('<HH')
-                        logging.debug(f"PSN_INFO Tracker Sub-Chunk - ID: {sub_chunk_id}, Length: {sub_chunk_length}")
-
-                        if sub_chunk_id == 0x0000:  # PSN_INFO_TRACKER_NAME
-                            tracker_name = struct.unpack_from(f'<{sub_chunk_length}s', data, offset)[0].decode('utf-8').strip('\x00')
-                            tracker_info['name'] = tracker_name
-                            offset += sub_chunk_length
-                        else:
-                            offset += sub_chunk_length
-
-                    packet_info[f'tracker_{tracker_id}'] = tracker_info
-                    logging.debug(f"Tracker ID: {tracker_id}, Name: {tracker_info.get('name', 'Unknown')}")
-            else:
-                offset += chunk_length
-
-    except struct.error as e:
-        logging.error(f"Error parsing PSN_INFO packet: {e}")
-
-    return packet_info
-
 def parse_psn_data_packet(data):
     """
     Parses a PSN_DATA packet and returns tracker positions.
@@ -78,9 +28,23 @@ def parse_psn_data_packet(data):
 
     try:
         # Extract header
-        timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
-        offset += struct.calcsize('<QBBBB')
-        logging.debug(f"PSN_DATA Header - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
+        chunk_id, data_field = struct.unpack_from('<HH', data, offset)
+        offset += struct.calcsize('<HH')
+        logging.debug(f"PSN_DATA Header - Chunk ID: {chunk_id}, Data Field: {data_field}")
+
+        if chunk_id != 0x6755:  # Ensure it's a PSN_DATA packet
+            logging.error("Received packet is not PSN_DATA_PACKET")
+            return packet_info
+
+        # Extract PSN_DATA_PACKET_HEADER
+        chunk_id, chunk_length = struct.unpack_from('<HH', data, offset)
+        offset += struct.calcsize('<HH')
+        logging.debug(f"PSN_DATA_PACKET_HEADER - Chunk ID: {chunk_id}, Length: {chunk_length}")
+
+        if chunk_id == 0x0000:  # PSN_DATA_PACKET_HEADER
+            timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
+            offset += struct.calcsize('<QBBBB')
+            logging.debug(f"PSN_DATA_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
 
         # Loop through the packet chunks
         while offset < len(data):
@@ -116,6 +80,70 @@ def parse_psn_data_packet(data):
 
     except struct.error as e:
         logging.error(f"Error parsing PSN_DATA packet: {e}")
+
+    return packet_info
+
+def parse_psn_info_packet(data):
+    """
+    Parses a PSN_INFO packet and returns tracker names.
+    """
+    packet_info = {}
+    offset = 0
+
+    try:
+        # Extract header
+        chunk_id, data_field = struct.unpack_from('<HH', data, offset)
+        offset += struct.calcsize('<HH')
+        logging.debug(f"PSN_INFO Header - Chunk ID: {chunk_id}, Data Field: {data_field}")
+
+        if chunk_id != 0x6756:  # Ensure it's a PSN_INFO packet
+            logging.error("Received packet is not PSN_INFO_PACKET")
+            return packet_info
+
+        # Extract PSN_INFO_PACKET_HEADER
+        chunk_id, chunk_length = struct.unpack_from('<HH', data, offset)
+        offset += struct.calcsize('<HH')
+        logging.debug(f"PSN_INFO_PACKET_HEADER - Chunk ID: {chunk_id}, Length: {chunk_length}")
+
+        if chunk_id == 0x0000:  # PSN_INFO_PACKET_HEADER
+            timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
+            offset += struct.calcsize('<QBBBB')
+            logging.debug(f"PSN_INFO_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
+
+        # Loop through the packet chunks
+        while offset < len(data):
+            chunk_id, chunk_length = struct.unpack_from('<HH', data, offset)
+            offset += struct.calcsize('<HH')
+            logging.debug(f"PSN_INFO Chunk - ID: {chunk_id}, Length: {chunk_length}")
+
+            if chunk_id == 0x0002:  # PSN_INFO_TRACKER_LIST
+                end_offset = offset + chunk_length
+                while offset < end_offset:
+                    tracker_id, tracker_chunk_length = struct.unpack_from('<HH', data, offset)
+                    offset += struct.calcsize('<HH')
+                    tracker_data_offset = offset
+                    logging.debug(f"PSN_INFO Tracker - ID: {tracker_id}, Chunk Length: {tracker_chunk_length}")
+
+                    tracker_info = {}
+                    while offset < tracker_data_offset + tracker_chunk_length:
+                        sub_chunk_id, sub_chunk_length = struct.unpack_from('<HH', data, offset)
+                        offset += struct.calcsize('<HH')
+                        logging.debug(f"PSN_INFO Tracker Sub-Chunk - ID: {sub_chunk_id}, Length: {sub_chunk_length}")
+
+                        if sub_chunk_id == 0x0000:  # PSN_INFO_TRACKER_NAME
+                            tracker_name = struct.unpack_from(f'<{sub_chunk_length}s', data, offset)[0].decode('utf-8').strip('\x00')
+                            tracker_info['name'] = tracker_name
+                            offset += sub_chunk_length
+                        else:
+                            offset += sub_chunk_length
+
+                    packet_info[f'tracker_{tracker_id}'] = tracker_info
+                    logging.debug(f"Tracker ID: {tracker_id}, Name: {tracker_info.get('name', 'Unknown')}")
+            else:
+                offset += chunk_length
+
+    except struct.error as e:
+        logging.error(f"Error parsing PSN_INFO packet: {e}")
 
     return packet_info
 
