@@ -10,7 +10,7 @@ MAX_PACKET_SIZE = 1500
 
 # Configuration for logging
 LOG_TO_FILE = False
-LOG_TO_CONSOLE = False
+LOG_TO_CONSOLE = True
 DISPLAY_TRACKER_UPDATES = True
 LOG_FILE = 'psn_receiver.log'
 
@@ -115,7 +115,7 @@ def parse_psn_info_tracker_list(data):
             offset += chunk_header.data_len
             tracker_id = chunk_header.id
             tracker_name = re.sub(r'[^\x20-\x7E]+', '', chunk_data.decode('utf-8')).strip()
-            chunks.append((tracker_id, tracker_name))
+            chunks.append((tracker_name, tracker_id))
         except Exception as e:
             logger.error(f"Error parsing PSN info tracker list: {e}")
             break
@@ -123,7 +123,7 @@ def parse_psn_info_tracker_list(data):
 
 def format_tracker_list(tracker_list):
     formatted_list = []
-    for tracker_id, tracker_name in tracker_list:
+    for tracker_name, tracker_id in tracker_list:
         formatted_list.append(f"    TrackerID: {tracker_id:<5} Name: {tracker_name}")
     return "\n".join(formatted_list)
 
@@ -160,9 +160,9 @@ def start_udp_receiver():
                             logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
 
                     # Update the trackers dictionary
-                    for tracker_id, tracker_name in tracker_list:
-                        trackers[tracker_id] = {
-                            'name': tracker_name,
+                    for tracker_name, tracker_id in tracker_list:
+                        trackers[tracker_name] = {
+                            'id': tracker_id,
                             'system_name': system_name,
                             'ip_address': ip_address
                         }
