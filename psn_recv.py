@@ -36,6 +36,7 @@ def parse_psn_info_packet(data):
         while offset < len(data):
             chunk_id, chunk_length = struct.unpack_from('<HH', data, offset)
             offset += struct.calcsize('<HH')
+            logging.debug(f"PSN_INFO Chunk - ID: {chunk_id}, Length: {chunk_length}")
 
             if chunk_id == 0x0002:  # PSN_INFO_TRACKER_LIST
                 end_offset = offset + chunk_length
@@ -43,14 +44,16 @@ def parse_psn_info_packet(data):
                     tracker_id, tracker_chunk_length = struct.unpack_from('<HH', data, offset)
                     offset += struct.calcsize('<HH')
                     tracker_data_offset = offset
+                    logging.debug(f"PSN_INFO Tracker - ID: {tracker_id}, Chunk Length: {tracker_chunk_length}")
 
                     tracker_info = {}
                     while offset < tracker_data_offset + tracker_chunk_length:
                         sub_chunk_id, sub_chunk_length = struct.unpack_from('<HH', data, offset)
                         offset += struct.calcsize('<HH')
+                        logging.debug(f"PSN_INFO Tracker Sub-Chunk - ID: {sub_chunk_id}, Length: {sub_chunk_length}")
 
                         if sub_chunk_id == 0x0000:  # PSN_INFO_TRACKER_NAME
-                            tracker_name = struct.unpack_from(f'<{sub_chunk_length}s', data, offset)[0].decode('utf-8')
+                            tracker_name = struct.unpack_from(f'<{sub_chunk_length}s', data, offset)[0].decode('utf-8').strip('\x00')
                             tracker_info['name'] = tracker_name
                             offset += sub_chunk_length
                         else:
@@ -83,6 +86,7 @@ def parse_psn_data_packet(data):
         while offset < len(data):
             chunk_id, chunk_length = struct.unpack_from('<HH', data, offset)
             offset += struct.calcsize('<HH')
+            logging.debug(f"PSN_DATA Chunk - ID: {chunk_id}, Length: {chunk_length}")
 
             if chunk_id == 0x0001:  # PSN_DATA_TRACKER_LIST
                 end_offset = offset + chunk_length
@@ -90,11 +94,13 @@ def parse_psn_data_packet(data):
                     tracker_id, tracker_chunk_length = struct.unpack_from('<HH', data, offset)
                     offset += struct.calcsize('<HH')
                     tracker_data_offset = offset
+                    logging.debug(f"PSN_DATA Tracker - ID: {tracker_id}, Chunk Length: {tracker_chunk_length}")
 
                     tracker_info = {}
                     while offset < tracker_data_offset + tracker_chunk_length:
                         sub_chunk_id, sub_chunk_length = struct.unpack_from('<HH', data, offset)
                         offset += struct.calcsize('<HH')
+                        logging.debug(f"PSN_DATA Tracker Sub-Chunk - ID: {sub_chunk_id}, Length: {sub_chunk_length}")
 
                         if sub_chunk_id == 0x0000:  # PSN_DATA_TRACKER_POS
                             pos_x, pos_y, pos_z = struct.unpack_from('<fff', data, offset)
