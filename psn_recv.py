@@ -210,6 +210,7 @@ def start_udp_receiver():
             data, addr = sock.recvfrom(MAX_PACKET_SIZE)
             ip_address = addr[0]
             logger.debug(f"Received packet from {ip_address}")
+
             chunks = parse_chunks(data)
             for chunk_type, chunk_data in chunks:
                 if chunk_type == 'PSN_INFO_PACKET':
@@ -227,7 +228,6 @@ def start_udp_receiver():
                         else:
                             logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
 
-                    # Update the trackers dictionary
                     for tracker_name, tracker_id in tracker_list:
                         trackers[tracker_name] = {
                             'id': tracker_id,
