@@ -57,7 +57,7 @@ class PSNDecoder:
         if chunk_id == PSN_INFO_PACKET_HEADER:
             timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
             offset += struct.calcsize('<QBBBB')
-            logging.debug(f"PSN_INFO_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version.low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
+            logging.debug(f"PSN_INFO_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
 
         # Loop through the packet chunks
         while offset < len(data):
@@ -124,12 +124,9 @@ class PSNDecoder:
                         offset += struct.calcsize('<HH')
                         logging.debug(f"PSN_DATA Tracker Sub-Chunk - ID: {sub_chunk_id}, Length: {sub_chunk_length}")
 
-                        if sub_chunk_length == 32856:
-                            logging.debug("Found large sub-chunk indicating new tracker data")
-                            tracker_id, tracker_chunk_length = struct.unpack_from('<HH', data, offset)
-                            offset += struct.calcsize('<HH')
-                            tracker_data_offset = offset
-                            logging.debug(f"PSN_DATA Tracker - ID: {tracker_id}, Chunk Length: {tracker_chunk_length}")
+                        # Log the raw sub-chunk data for analysis
+                        sub_chunk_data = data[offset:offset + sub_chunk_length]
+                        logging.debug(f"Raw Sub-Chunk Data: {sub_chunk_data.hex()}")
 
                         if sub_chunk_id == PSN_DATA_TRACKER_POS:
                             pos_x, pos_y, pos_z = struct.unpack_from('<fff', data, offset)
