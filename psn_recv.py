@@ -102,7 +102,7 @@ def parse_psn_data_packet(data):
     if chunk_id == PSN_DATA_PACKET_HEADER:
         timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
         offset += struct.calcsize('<QBBBB')
-        logging.debug(f"PSN_DATA_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
+        logging.debug(f"PSN_DATA_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version.low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
 
     # Loop through the packet chunks
     while offset < len(data):
@@ -131,8 +131,6 @@ def parse_psn_data_packet(data):
                     else:
                         offset += sub_chunk_length
 
-                if tracker_id in packet_info:
-                    logging.debug(f"Duplicate Tracker ID found: {tracker_id}, overwriting previous data")
                 packet_info[tracker_id] = tracker_info
                 logging.debug(f"Tracker ID: {tracker_id}, Position: {tracker_info.get('position', 'Unknown')}")
         else:
