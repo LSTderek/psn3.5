@@ -127,6 +127,11 @@ class PSNDecoder:
                         offset += struct.calcsize('<HH')
                         logging.debug(f"PSN_DATA Tracker Sub-Chunk - ID: {sub_chunk_id}, Length: {sub_chunk_length}")
 
+                        if sub_chunk_length == 32856:
+                            logging.debug("Skipping large sub-chunk with length 32856")
+                            offset += sub_chunk_length
+                            continue
+
                         if sub_chunk_id == PSN_DATA_TRACKER_POS:
                             pos_x, pos_y, pos_z = struct.unpack_from('<fff', data, offset)
                             tracker_info['position'] = (pos_x, pos_y, pos_z)
@@ -134,6 +139,8 @@ class PSNDecoder:
                         else:
                             offset += sub_chunk_length
 
+                    if tracker_id in self.packet_info:
+                        logging.debug(f"Duplicate Tracker ID found: {tracker_id}, overwriting previous data")
                     self.packet_info[tracker_id] = tracker_info
                     logging.debug(f"Tracker ID: {tracker_id}, Position: {tracker_info.get('position', 'Unknown')}")
             else:
