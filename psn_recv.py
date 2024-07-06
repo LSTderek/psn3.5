@@ -10,38 +10,61 @@ MCAST_PORT = 56565
 DEBUG = True
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG if DEBUG else logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.DEBUG if DEBUG else logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("psn_listener.log"),
+        logging.StreamHandler()
+    ]
+)
 
 # Function to parse PSN data packets
 def parse_psn_packet(data):
     try:
         # Unpack the packet header (example header structure)
-        packet_timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<Q4B', data, 0)
+        packet_header_format = '<Q4B'
+        packet_header_size = struct.calcsize(packet_header_format)
+        packet_timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from(packet_header_format, data, 0)
         
-        # Print packet information
+        # Log packet information
         logging.debug(f"Packet Timestamp: {packet_timestamp}")
         logging.debug(f"Version: {version_high}.{version_low}")
         logging.debug(f"Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
 
         # Move to the data section (assumed offset after header)
-        offset = 16
+        offset = packet_header_size
         while offset < len(data):
             # Read chunk header (example chunk header structure)
-            chunk_id, data_len, has_subchunks = struct.unpack_from('<IBB', data, offset)
-            offset += 6
+            chunk_header_format = '<IBB'
+            chunk_header_size = struct.calcsize(chunk_header_format)
+            chunk_id, data_len, has_subchunks = struct.unpack_from(chunk_header_format, data, offset)
+            offset += chunk_header_size
             
+            logging.debug(f"Chunk ID: {chunk_id}, Data Length: {data_len}, Has Subchunks: {has_subchunks}")
+
             # Handle different chunk types
             if chunk_id == 0x0000:  # PSN_DATA_TRACKER_POS
-                pos_x, pos_y, pos_z = struct.unpack_from('<3f', data, offset)
-                print(f"Tracker Position - X: {pos_x}, Y: {pos_y}, Z: {pos_z}")
+                if data_len == 12:  # 3 floats * 4 bytes each
+                    pos_x, pos_y, pos_z = struct.unpack_from('<3f', data, offset)
+                    print(f"Tracker Position - X: {pos_x}, Y: {pos_y}, Z: {pos_z}")
+                else:
+                    logging.error(f"Unexpected data length for PSN_DATA_TRACKER_POS: {data_len}")
             elif chunk_id == 0x0001:  # PSN_DATA_TRACKER_SPEED
-                speed_x, speed_y, speed_z = struct.unpack_from('<3f', data, offset)
-                print(f"Tracker Speed - X: {speed_x}, Y: {speed_y}, Z: {speed_z}")
+                if data_len == 12:  # 3 floats * 4 bytes each
+                    speed_x, speed_y, speed_z = struct.unpack_from('<3f', data, offset)
+                    print(f"Tracker Speed - X: {speed_x}, Y: {speed_y}, Z: {speed_z}")
+                else:
+                    logging.error(f"Unexpected data length for PSN_DATA_TRACKER_SPEED: {data_len}")
             elif chunk_id == 0x0002:  # PSN_DATA_TRACKER_ORI
-                ori_x, ori_y, ori_z = struct.unpack_from('<3f', data, offset)
-                print(f"Tracker Orientation - X: {ori_x}, Y: {ori_y}, Z: {ori_z}")
-            
+                if data_len == 12:  # 3 floats * 4 bytes each
+                    ori_x, ori_y, ori_z = struct.unpack_from('<3f', data, offset)
+                    print(f"Tracker Orientation - X: {ori_x}, Y: {ori_y}, Z: {ori_z}")
+                else:
+                    logging.error(f"Unexpected data length for PSN_DATA_TRACKER_ORI: {data_len}")
+            else:
+                logging.debug(f"Unknown chunk ID: {chunk_id} with data length: {data_len}")
+
             # Move to the next chunk
             offset += data_len
     except struct.error as e:
