@@ -107,7 +107,7 @@ class PSNDecoder:
         if chunk_id == PSN_DATA_PACKET_HEADER:
             timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
             offset += struct.calcsize('<QBBBB')
-            logging.debug(f"PSN_DATA_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version.low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
+            logging.debug(f"PSN_DATA_PACKET_HEADER - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
 
         # Loop through the packet chunks
         while offset < len(data):
@@ -131,6 +131,8 @@ class PSNDecoder:
 
                         # Check if buffer size is sufficient before unpacking
                         remaining_buffer_size = len(data) - offset
+                        logging.debug(f"Remaining Buffer Size: {remaining_buffer_size}, Sub-Chunk Length: {sub_chunk_length}")
+
                         if remaining_buffer_size < sub_chunk_length:
                             logging.warning(f"Buffer too small for sub-chunk. Expected: {sub_chunk_length}, Remaining: {remaining_buffer_size}")
                             break
