@@ -8,6 +8,9 @@ PORT = 56565
 # Define function to parse and display PSN_INFO packets
 def parse_psn_info_packet(data):
     index = 0
+    tracker_count = 0
+    trackers = []
+    
     while index < len(data):
         chunk_id, data_len, has_subchunks = struct.unpack_from('<HHH', data, index)
         index += 6
@@ -15,6 +18,7 @@ def parse_psn_info_packet(data):
         print(f"Chunk ID: {chunk_id:#06x}")
         print(f"Data Length: {data_len}")
         print(f"Has Sub Chunks: {'Yes' if has_subchunks else 'No'}")
+        
         if chunk_id == 0x6756:  # PSN_INFO_PACKET
             parse_psn_info_packet(data[index:index+data_len])
         elif chunk_id == 0x0000:  # PSN_INFO_PACKET_HEADER
@@ -28,8 +32,35 @@ def parse_psn_info_packet(data):
             system_name = data[index:index+data_len].decode('utf-8')
             print(f"System Name: {system_name}")
         elif chunk_id == 0x0002:  # PSN_INFO_TRACKER_LIST
-            parse_psn_info_packet(data[index:index+data_len])
+            tracker_count, trackers = parse_tracker_list(data[index:index+data_len])
+        
         index += data_len
+    
+    print(f"Number of Trackers: {tracker_count}")
+    for tracker in trackers:
+        print(f"Tracker ID: {tracker['id']}, Name: {tracker['name']}")
+
+# Define function to parse tracker list
+def parse_tracker_list(data):
+    index = 0
+    trackers = []
+    
+    while index < len(data):
+        tracker_id, data_len, has_subchunks = struct.unpack_from('<HHH', data, index)
+        index += 6
+        has_subchunks = (has_subchunks >> 15) & 0x1
+        tracker_name = ''
+        
+        if has_subchunks:
+            subchunk_id, subchunk_len, subchunk_has_subchunks = struct.unpack_from('<HHH', data, index)
+            index += 6
+            if subchunk_id == 0x0000:  # PSN_INFO_TRACKER_NAME
+                tracker_name = data[index:index+subchunk_len].decode('utf-8')
+                index += subchunk_len
+
+        trackers.append({'id': tracker_id, 'name': tracker_name})
+    
+    return len(trackers), trackers
 
 # Set up UDP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
