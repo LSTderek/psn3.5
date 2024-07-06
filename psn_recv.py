@@ -144,7 +144,6 @@ def start_udp_receiver():
         try:
             data, addr = sock.recvfrom(MAX_PACKET_SIZE)
             ip_address = addr[0]
-            logger.info(f"Received raw packet from {ip_address}: {data}")
             chunks = parse_chunks(data)
             for chunk_type, chunk_data in chunks:
                 if chunk_type == 'PSN_INFO_PACKET':
