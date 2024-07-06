@@ -146,8 +146,7 @@ def start_udp_receiver():
                         elif sub_chunk_type == 'PSN_INFO_SYSTEM_NAME':
                             logger.info(f"  PSN_INFO_SYSTEM_NAME: {sub_chunk_data}")
                         elif sub_chunk_type == 'PSN_INFO_TRACKER_LIST':
-                            logger.info("  PSN_INFO_TRACKER_LIST:")
-                            logger.info(format_tracker_list(sub_chunk_data))
+                            logger.info("  PSN_INFO_TRACKER_LIST:\n" + format_tracker_list(sub_chunk_data))
                         else:
                             logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
         except Exception as e:
