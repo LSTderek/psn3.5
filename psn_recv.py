@@ -131,6 +131,8 @@ def parse_psn_data_packet(data):
                     else:
                         offset += sub_chunk_length
 
+                if tracker_id in packet_info:
+                    logging.debug(f"Duplicate Tracker ID found: {tracker_id}, overwriting previous data")
                 packet_info[tracker_id] = tracker_info
                 logging.debug(f"Tracker ID: {tracker_id}, Position: {tracker_info.get('position', 'Unknown')}")
         else:
@@ -155,7 +157,7 @@ def main():
     try:
         while True:
             data, _ = sock.recvfrom(BUFFER_SIZE)
-            print(f"Raw data: {data.hex()}")
+            logging.debug(f"Raw data received: {data.hex()}")
             if len(data) > 4:
                 header_id = struct.unpack_from('<H', data, 0)[0]
                 if header_id == PSN_INFO_PACKET:
@@ -181,4 +183,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
