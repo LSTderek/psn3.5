@@ -12,6 +12,9 @@ class PSNChunkHeader:
         self.data_len = (header >> 16) & 0x7FFF
         self.has_subchunks = (header >> 31) & 0x01
 
+    def __str__(self):
+        return f"Chunk ID: {self.id}, Data Length: {self.data_len}, Has Subchunks: {self.has_subchunks}"
+
 class PSNInfoPacketHeader:
     def __init__(self, data):
         self.timestamp, = struct.unpack('<Q', data[:8])
@@ -20,15 +23,10 @@ class PSNInfoPacketHeader:
         self.frame_id, = struct.unpack('<B', data[10:11])
         self.frame_packet_count, = struct.unpack('<B', data[11:12])
 
-class PSNDataPacketHeader:
-    def __init__(self, data):
-        self.timestamp, = struct.unpack('<Q', data[:8])
-        self.version_high, = struct.unpack('<B', data[8:9])
-        self.version_low, = struct.unpack('<B', data[9:10])
-        self.frame_id, = struct.unpack('<B', data[10:11])
-        self.frame_packet_count, = struct.unpack('<B', data[11:12])
-
-# Define other chunk classes similarly...
+    def __str__(self):
+        return (f"Timestamp: {self.timestamp}, Version High: {self.version_high}, "
+                f"Version Low: {self.version_low}, Frame ID: {self.frame_id}, "
+                f"Frame Packet Count: {self.frame_packet_count}")
 
 def parse_chunks(data, offset=0):
     chunks = []
@@ -39,11 +37,7 @@ def parse_chunks(data, offset=0):
         offset += chunk_header.data_len
         if chunk_header.id == 0x6756:
             chunks.append(('PSN_INFO_PACKET', parse_psn_info_packet(chunk_data)))
-        elif chunk_header.id == 0x6755:
-            chunks.append(('PSN_DATA_PACKET', parse_psn_data_packet(chunk_data)))
-        # Add more conditions for other chunk types...
-        else:
-            chunks.append(('UNKNOWN_CHUNK', chunk_data))
+        # Ignore other chunk types for now...
     return chunks
 
 def parse_psn_info_packet(data):
@@ -58,12 +52,14 @@ def parse_psn_info_packet(data):
             chunks.append(('PSN_INFO_PACKET_HEADER', PSNInfoPacketHeader(chunk_data)))
         elif chunk_header.id == 0x0001:
             chunks.append(('PSN_INFO_SYSTEM_NAME', chunk_data.decode('utf-8')))
+        elif chunk_header.id == 0x0002:
+            chunks.append(('PSN_INFO_TRACKER_LIST', parse_psn_info_tracker_list(chunk_data)))
         # Add more conditions for other info chunk types...
         else:
             chunks.append(('UNKNOWN_CHUNK', chunk_data))
     return chunks
 
-def parse_psn_data_packet(data):
+def parse_psn_info_tracker_list(data):
     chunks = []
     offset = 0
     while offset < len(data):
@@ -72,10 +68,7 @@ def parse_psn_data_packet(data):
         chunk_data = data[offset:offset + chunk_header.data_len]
         offset += chunk_header.data_len
         if chunk_header.id == 0x0000:
-            chunks.append(('PSN_DATA_PACKET_HEADER', PSNDataPacketHeader(chunk_data)))
-        elif chunk_header.id == 0x0001:
-            chunks.append(('PSN_DATA_TRACKER_LIST', chunk_data))
-        # Add more conditions for other data chunk types...
+            chunks.append(('PSN_INFO_TRACKER_NAME', chunk_data.decode('utf-8')))
         else:
             chunks.append(('UNKNOWN_CHUNK', chunk_data))
     return chunks
@@ -90,8 +83,11 @@ def start_udp_receiver():
     while True:
         data, _ = sock.recvfrom(MAX_PACKET_SIZE)
         chunks = parse_chunks(data)
-        # Process chunks as needed...
-        print(chunks)
+        for chunk_type, chunk_data in chunks:
+            if chunk_type == 'PSN_INFO_PACKET':
+                print("PSN_INFO_PACKET:")
+                for sub_chunk_type, sub_chunk_data in chunk_data:
+                    print(f"  {sub_chunk_type}: {sub_chunk_data}")
 
 if __name__ == "__main__":
     start_udp_receiver()
