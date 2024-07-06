@@ -27,6 +27,8 @@ def parse_psn_info_packet(data):
     while offset < len(data):
         chunk_id, chunk_data, has_subchunks, offset = parse_chunk(data, offset)
         
+        print(f"Chunk ID: {chunk_id}, Data Length: {len(chunk_data)}, Has Subchunks: {has_subchunks}")
+        
         if chunk_id == 0x6756:  # PSN_V2_INFO_PACKET
             print("PSN_V2_INFO_PACKET")
         elif chunk_id == 0x0000:  # PSN_INFO_PACKET_HEADER
@@ -45,6 +47,7 @@ def parse_tracker_list(data):
     offset = 0
     while offset < len(data):
         tracker_id, tracker_chunk_data, tracker_has_subchunks, offset = parse_chunk(data, offset)
+        print(f"Tracker ID: {tracker_id}, Data Length: {len(tracker_chunk_data)}, Has Subchunks: {tracker_has_subchunks}")
         if tracker_id == 0x0000:  # PSN_INFO_TRACKER_NAME
             tracker_name = tracker_chunk_data.decode('utf-8').strip('\x00')
             print(f"Tracker Name: {tracker_name}")
@@ -67,4 +70,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
