@@ -9,7 +9,7 @@ PORT = 56565
 # Buffer size for UDP packet
 BUFFER_SIZE = 1500
 
-# Set up logging to output to a file
+# Set up logging to output to a file and console
 logging.basicConfig(
     level=logging.DEBUG, 
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -26,10 +26,11 @@ def parse_psn_info_packet(data):
     packet_info = {}
     offset = 0
 
-    # Extract header
     try:
+        # Extract header
         timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
         offset += struct.calcsize('<QBBBB')
+        logging.debug(f"PSN_INFO Header - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
 
         # Loop through the packet chunks
         while offset < len(data):
@@ -56,6 +57,7 @@ def parse_psn_info_packet(data):
                             offset += sub_chunk_length
 
                     packet_info[f'tracker_{tracker_id}'] = tracker_info
+                    logging.debug(f"Tracker ID: {tracker_id}, Name: {tracker_info.get('name', 'Unknown')}")
             else:
                 offset += chunk_length
 
@@ -71,10 +73,11 @@ def parse_psn_data_packet(data):
     packet_info = {}
     offset = 0
 
-    # Extract header
     try:
+        # Extract header
         timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, offset)
         offset += struct.calcsize('<QBBBB')
+        logging.debug(f"PSN_DATA Header - Timestamp: {timestamp}, Version: {version_high}.{version_low}, Frame ID: {frame_id}, Frame Packet Count: {frame_packet_count}")
 
         # Loop through the packet chunks
         while offset < len(data):
@@ -101,6 +104,7 @@ def parse_psn_data_packet(data):
                             offset += sub_chunk_length
 
                     packet_info[f'tracker_{tracker_id}'] = tracker_info
+                    logging.debug(f"Tracker ID: {tracker_id}, Position: {tracker_info.get('position', 'Unknown')}")
             else:
                 offset += chunk_length
 
