@@ -11,7 +11,7 @@ BUFFER_SIZE = 1500
 
 # Set up logging to output to a file
 logging.basicConfig(
-    level=logging.DEBUG, 
+    level=logging.INFO, 
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler("psn_data.log"),
@@ -56,6 +56,10 @@ def parse_psn_data_packet(data):
                             pos_x, pos_y, pos_z = struct.unpack_from('<fff', data, offset)
                             tracker_info['position'] = (pos_x, pos_y, pos_z)
                             offset += struct.calcsize('<fff')
+                        elif sub_chunk_id == 0x0000:  # PSN_DATA_TRACKER_NAME
+                            tracker_name = struct.unpack_from(f'<{sub_chunk_length}s', data, offset)[0].decode('utf-8')
+                            tracker_info['name'] = tracker_name
+                            offset += struct.calcsize(f'<{sub_chunk_length}s')
                         else:
                             offset += sub_chunk_length
 
@@ -90,8 +94,11 @@ def main():
                 if tracker_id.startswith('tracker_'):
                     tracker_id_num = tracker_id.split('_')[1]
                     position = tracker_data.get('position', None)
+                    name = tracker_data.get('name', 'Unknown')
                     if position:
-                        logging.info(f"Tracker ID: {tracker_id_num}, Position: {position}")
+                        print(f'TrackerID: "{tracker_id_num}"')
+                        print(f'TrackerName: "{name}"')
+                        print(f'Pos: "{position[0]}, {position[1]}, {position[2]}"')
 
     except KeyboardInterrupt:
         logging.info("Exiting.")
