@@ -128,9 +128,11 @@ class PSNDecoder:
                         logging.debug(f"PSN_DATA Tracker Sub-Chunk - ID: {sub_chunk_id}, Length: {sub_chunk_length}")
 
                         if sub_chunk_length == 32856:
-                            logging.debug("Skipping large sub-chunk with length 32856")
-                            offset += sub_chunk_length
-                            continue
+                            logging.debug("Found large sub-chunk indicating new tracker data")
+                            tracker_id, tracker_chunk_length = struct.unpack_from('<HH', data, offset)
+                            offset += struct.calcsize('<HH')
+                            tracker_data_offset = offset
+                            logging.debug(f"PSN_DATA Tracker - ID: {tracker_id}, Chunk Length: {tracker_chunk_length}")
 
                         if sub_chunk_id == PSN_DATA_TRACKER_POS:
                             pos_x, pos_y, pos_z = struct.unpack_from('<fff', data, offset)
