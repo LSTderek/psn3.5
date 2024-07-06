@@ -99,7 +99,8 @@ def parse_chunks(data, offset=0):
                 chunks.append(('PSN_INFO_PACKET', parse_psn_info_packet(chunk_data)))
             elif chunk_header.id == 0x6765:
                 chunks.append(('PSN_DATA_PACKET', parse_psn_data_packet(chunk_data)))
-            # Ignore other chunk types for now...
+            else:
+                logger.debug(f"Ignoring unknown chunk ID: {chunk_header.id}")
         except Exception as e:
             logger.error(f"Error parsing chunk: {e}")
             break
