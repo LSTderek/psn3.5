@@ -10,7 +10,7 @@ PORT = 56565
 BUFFER_SIZE = 1500
 
 # Enable or disable debug logging
-DEBUG_LOGGING = True
+DEBUG_LOGGING = False
 
 # Set up logging
 if DEBUG_LOGGING:
