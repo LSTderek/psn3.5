@@ -23,7 +23,8 @@ def parse_psn_info_packet(data, depth=0):
         print(f"{indent}Has Sub Chunks: {'Yes' if has_subchunks else 'No'}")
 
         if chunk_id == 0x6756:  # PSN_INFO_PACKET
-            parse_psn_info_packet(data[index:index + data_len], depth + 1)
+            trackers = parse_psn_info_packet(data[index:index + data_len], depth + 1)
+            tracker_count = len(trackers)
         elif chunk_id == 0x0000:  # PSN_INFO_PACKET_HEADER
             timestamp, version_high, version_low, frame_id, frame_packet_count = struct.unpack_from('<QBBBB', data, index)
             print(f"{indent}Timestamp: {timestamp}")
@@ -40,9 +41,12 @@ def parse_psn_info_packet(data, depth=0):
 
         index += data_len
 
-    print(f"Number of Trackers: {tracker_count}")
-    for tracker in trackers:
-        print(f"Tracker ID: {tracker['id']}, Name: {tracker['name']}")
+    if depth == 0:
+        print(f"Number of Trackers: {tracker_count}")
+        for tracker in trackers:
+            print(f"Tracker ID: {tracker['id']}, Name: {tracker['name']}")
+
+    return trackers
 
 # Function to parse tracker list
 def parse_tracker_list(data, depth=0):
