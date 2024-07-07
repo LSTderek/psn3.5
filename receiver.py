@@ -2,8 +2,8 @@ import socket
 import struct
 import logging
 from logging.handlers import RotatingFileHandler
-from multiprocessing.connection import Client
 import re
+from multiprocessing.connection import Client
 
 MULTICAST_GROUP = '236.10.10.10'
 PORT = 56565
@@ -46,6 +46,27 @@ class PSNChunkHeader:
     def __str__(self):
         return f"Chunk ID: {self.id}, Data Length: {self.data_len}, Has Subchunks: {self.has_subchunks}"
 
+class PSNInfoPacketHeader:
+    def __init__(self, data):
+        try:
+            self.timestamp, = struct.unpack('<Q', data[:8])
+            self.version_high, = struct.unpack('<B', data[8:9])
+            self.version_low, = struct.unpack('<B', data[9:10])
+            self.frame_id, = struct.unpack('<B', data[10:11])
+            self.frame_packet_count, = struct.unpack('<B', data[11:12])
+        except struct.error as e:
+            logger.error(f"Failed to unpack PSNInfoPacketHeader: {e}")
+            self.timestamp = 0
+            self.version_high = 0
+            self.version_low = 0
+            self.frame_id = 0
+            self.frame_packet_count = 0
+
+    def __str__(self):
+        return (f"Timestamp: {self.timestamp}, Version High: {self.version_high}, "
+                f"Version Low: {self.version_low}, Frame ID: {self.frame_id}, "
+                f"Frame Packet Count: {self.frame_packet_count}")
+
 def parse_chunks(data, offset=0):
     chunks = []
     while offset < len(data):
@@ -55,37 +76,80 @@ def parse_chunks(data, offset=0):
             chunk_data = data[offset:offset + chunk_header.data_len]
             offset += chunk_header.data_len
             if chunk_header.id == 0x6756:
-                chunks.append(('PSN_INFO_PACKET', chunk_data))
+                chunks.append(('PSN_INFO_PACKET', parse_psn_info_packet(chunk_data)))
             else:
-                chunks.append(('UNKNOWN_CHUNK', chunk_data))
+                chunks.append(('PSN_DATA_PACKET', chunk_data))
         except Exception as e:
             logger.error(f"Error parsing chunk: {e}")
             break
     return chunks
 
-def start_udp_receiver(enable_info_parser=True, enable_data_parser=True):
+def parse_psn_info_packet(data):
+    chunks = []
+    offset = 0
+    while offset < len(data):
+        try:
+            chunk_header = PSNChunkHeader(data[offset:offset+4])
+            offset += 4
+            chunk_data = data[offset:offset + chunk_header.data_len]
+            offset += chunk_header.data_len
+            if chunk_header.id == 0x0000:
+                chunks.append(('PSN_INFO_PACKET_HEADER', PSNInfoPacketHeader(chunk_data)))
+            elif chunk_header.id == 0x0001:
+                chunks.append(('PSN_INFO_SYSTEM_NAME', chunk_data.decode('utf-8').strip('\x00')))
+            elif chunk_header.id == 0x0002:
+                chunks.append(('PSN_INFO_TRACKER_LIST', parse_psn_info_tracker_list(chunk_data)))
+            else:
+                chunks.append(('UNKNOWN_CHUNK', chunk_data))
+        except Exception as e:
+            logger.error(f"Error parsing PSN info packet: {e}")
+            break
+    return chunks
+
+def parse_psn_info_tracker_list(data):
+    chunks = []
+    offset = 0
+    while offset < len(data):
+        try:
+            chunk_header = PSNChunkHeader(data[offset:offset+4])
+            offset += 4
+            chunk_data = data[offset:offset + chunk_header.data_len]
+            offset += chunk_header.data_len
+            tracker_id = chunk_header.id
+            tracker_name = re.sub(r'[^\x20-\x7E]+', '', chunk_data.decode('utf-8')).strip()
+            chunks.append((tracker_name, tracker_id))
+        except Exception as e:
+            logger.error(f"Error parsing PSN info tracker list: {e}")
+            break
+    return chunks
+
+def format_tracker_list(tracker_list):
+    formatted_list = []
+    for tracker_name, tracker_id in tracker_list:
+        formatted_list.append(f"    TrackerID: {tracker_id:<5} Name: {tracker_name}")
+    return "\n".join(formatted_list)
+
+# Store available trackers
+trackers = {}
+
+def connect_to_data_parser():
+    while True:
+        try:
+            conn = Client(('localhost', 6000), authkey=b'data_parser')
+            logger.info("Connected to Data Parser")
+            return conn
+        except ConnectionRefusedError:
+            logger.warning("Data Parser not available, retrying...")
+            time.sleep(5)
+
+def start_udp_receiver():
+    data_conn = connect_to_data_parser()
+    
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind((MULTICAST_GROUP, PORT))
     mreq = struct.pack("4sl", socket.inet_aton(MULTICAST_GROUP), socket.INADDR_ANY)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-
-    info_conn = None
-    data_conn = None
-
-    if enable_info_parser:
-        try:
-            info_conn = Client(('localhost', 6000), authkey=b'psn_secret_key')
-            logger.info("Connected to Info Parser")
-        except ConnectionRefusedError:
-            logger.error("Info Parser is not available")
-
-    if enable_data_parser:
-        try:
-            data_conn = Client(('localhost', 6001), authkey=b'psn_secret_key')
-            logger.info("Connected to Data Parser")
-        except ConnectionRefusedError:
-            logger.error("Data Parser is not available")
 
     logger.info("Starting UDP receiver...")
     while True:
@@ -96,22 +160,42 @@ def start_udp_receiver(enable_info_parser=True, enable_data_parser=True):
 
             chunks = parse_chunks(data)
             for chunk_type, chunk_data in chunks:
-                if chunk_type == 'PSN_INFO_PACKET' and info_conn:
-                    try:
-                        info_conn.send(chunk_data)
-                        logger.info("Sent PSN_INFO_PACKET to Info Parser")
-                    except Exception as e:
-                        logger.error(f"Failed to send to Info Parser: {e}")
-                        info_conn = None
-                elif chunk_type == 'UNKNOWN_CHUNK' and data_conn:
+                if chunk_type == 'PSN_INFO_PACKET':
+                    system_name = None
+                    tracker_list = []
+                    for sub_chunk_type, sub_chunk_data in chunk_data:
+                        if sub_chunk_type == 'PSN_INFO_PACKET_HEADER':
+                            logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
+                        elif sub_chunk_type == 'PSN_INFO_SYSTEM_NAME':
+                            system_name = sub_chunk_data
+                            logger.info(f"  PSN_INFO_SYSTEM_NAME: {system_name}")
+                        elif sub_chunk_type == 'PSN_INFO_TRACKER_LIST':
+                            tracker_list = sub_chunk_data
+                            logger.info("  PSN_INFO_TRACKER_LIST:\n" + format_tracker_list(tracker_list))
+                        else:
+                            logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
+
+                    # Update the trackers dictionary
+                    for tracker_name, tracker_id in tracker_list:
+                        trackers[tracker_name] = {
+                            'id': tracker_id,
+                            'system_name': system_name,
+                            'ip_address': ip_address
+                        }
+
+                    if DISPLAY_TRACKER_UPDATES:
+                        print(f"Updated trackers: {trackers}")
+
+                elif chunk_type == 'PSN_DATA_PACKET':
                     try:
                         data_conn.send(chunk_data)
-                        logger.info("Sent UNKNOWN_CHUNK to Data Parser")
+                        logger.info("Sent PSN_DATA_PACKET to Data Parser")
                     except Exception as e:
                         logger.error(f"Failed to send to Data Parser: {e}")
-                        data_conn = None
+                        data_conn = connect_to_data_parser()
+
         except Exception as e:
             logger.error(f"Error receiving data: {e}")
 
 if __name__ == "__main__":
-    start_udp_receiver(enable_info_parser=True, enable_data_parser=False)
+    start_udp_receiver()
