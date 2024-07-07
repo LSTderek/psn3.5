@@ -3,6 +3,7 @@ import struct
 import logging
 from logging.handlers import RotatingFileHandler
 from multiprocessing.connection import Client
+import time
 
 MULTICAST_GROUP = '236.10.10.10'
 PORT = 56565
@@ -13,7 +14,7 @@ LOG_TO_FILE = False
 LOG_TO_CONSOLE = True
 DISPLAY_TRACKER_UPDATES = True
 ENABLE_INFO_PARSER = True
-ENABLE_DATA_PARSER = False
+ENABLE_DATA_PARSER = True
 LOG_FILE = 'psn_receiver.log'
 
 # Set up logging
@@ -47,6 +48,15 @@ class PSNChunkHeader:
     def __str__(self):
         return f"Chunk ID: {self.id}, Data Length: {self.data_len}, Has Subchunks: {self.has_subchunks}"
 
+def connect_to_parser(address):
+    while True:
+        try:
+            conn = Client(address)
+            return conn
+        except ConnectionRefusedError:
+            logger.warning(f"Connection to {address} failed, retrying in 5 seconds...")
+            time.sleep(5)
+
 def start_udp_receiver():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -58,9 +68,9 @@ def start_udp_receiver():
     data_parser_conn = None
 
     if ENABLE_INFO_PARSER:
-        info_parser_conn = Client(('localhost', 6000))
+        info_parser_conn = connect_to_parser(('localhost', 6000))
     if ENABLE_DATA_PARSER:
-        data_parser_conn = Client(('localhost', 6001))
+        data_parser_conn = connect_to_parser(('localhost', 6001))
 
     logger.info("Starting UDP receiver...")
     while True:
@@ -68,17 +78,25 @@ def start_udp_receiver():
             data, addr = sock.recvfrom(MAX_PACKET_SIZE)
             ip_address = addr[0]
             chunk_header = PSNChunkHeader(data[:4])
-            
+
             if chunk_header.id == 0x6756 and ENABLE_INFO_PARSER:
-                info_parser_conn.send(data)
-                logger.info(f"Sent packet to info parser from {ip_address}")
-                parsed_info = info_parser_conn.recv()
-                logger.info(f"Info parser returned: {parsed_info}")
+                try:
+                    info_parser_conn.send(data)
+                    logger.info(f"Sent packet to info parser from {ip_address}")
+                    parsed_info = info_parser_conn.recv()
+                    logger.info(f"Info parser returned: {parsed_info}")
+                except Exception as e:
+                    logger.error(f"Error sending to info parser: {e}")
+                    info_parser_conn = connect_to_parser(('localhost', 6000))
             elif chunk_header.id == 0x1234 and ENABLE_DATA_PARSER:
-                data_parser_conn.send(data)
-                logger.info(f"Sent packet to data parser from {ip_address}")
-                parsed_data = data_parser_conn.recv()
-                logger.info(f"Data parser returned: {parsed_data}")
+                try:
+                    data_parser_conn.send(data)
+                    logger.info(f"Sent packet to data parser from {ip_address}")
+                    parsed_data = data_parser_conn.recv()
+                    logger.info(f"Data parser returned: {parsed_data}")
+                except Exception as e:
+                    logger.error(f"Error sending to data parser: {e}")
+                    data_parser_conn = connect_to_parser(('localhost', 6001))
             else:
                 logger.info(f"Unhandled packet type with chunk ID: {chunk_header.id}")
         except Exception as e:
