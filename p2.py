@@ -10,11 +10,15 @@ app = Flask(__name__)
 # List to store tracker names
 trackers_list = []
 
+# Define a function to convert bytes to string
+def bytes_to_str(b):
+    return b.decode('utf-8') if isinstance(b, bytes) else b
+
 # Define a callback function to handle the received PSN data
 def callback_function(data):
     global trackers_list
     if isinstance(data, pypsn.psn_info_packet):
-        trackers_list = [{'tracker_name': tracker.tracker_name} for tracker in data.trackers]
+        trackers_list = [{'tracker_name': bytes_to_str(tracker.tracker_name)} for tracker in data.trackers]
 
 # Create a receiver object with the callback function
 receiver = pypsn.receiver(callback_function)
