@@ -1,5 +1,6 @@
 import logging
 from multiprocessing.connection import Listener
+import pickle
 
 # Configuration for logging
 LOG_TO_FILE = False
@@ -34,7 +35,8 @@ def start_data_parser():
                 try:
                     data = conn.recv()
                     if data:
-                        logger.info(f"Received PSN_DATA_PACKET: {data}")
+                        chunk_data = pickle.loads(data)
+                        logger.info(f"Received PSN_DATA_PACKET: {chunk_data}")
                 except EOFError:
                     logger.info("Connection closed")
                     break

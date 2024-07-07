@@ -4,6 +4,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from multiprocessing.connection import Client
 import time
+import pickle
 
 MULTICAST_GROUP = '236.10.10.10'
 PORT = 56565
@@ -226,6 +227,7 @@ def start_udp_receiver():
                         else:
                             logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
 
+                    # Update the trackers dictionary
                     new_trackers = {}
                     for tracker_name, tracker_id in tracker_list:
                         new_trackers[tracker_name] = {
@@ -247,7 +249,8 @@ def start_udp_receiver():
                 elif chunk_type == 'PSN_DATA_PACKET':
                     if FORWARD_DATA_PACKETS and data_parser_conn:
                         try:
-                            data_parser_conn.send(chunk_data)
+                            serialized_data = pickle.dumps(chunk_data)
+                            data_parser_conn.send(serialized_data)
                             logger.info("Sent PSN_DATA_PACKET to DataParser")
                         except Exception as e:
                             logger.error(f"Failed to send data packet to DataParser: {e}")
