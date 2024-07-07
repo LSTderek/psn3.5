@@ -10,13 +10,17 @@ app = Flask(__name__)
 # List to store tracker data
 trackers_list = []
 
+# Define a function to convert psn_vector3 to a dictionary
+def vector3_to_dict(vector):
+    return {'x': vector.x, 'y': vector.y, 'z': vector.z}
+
 # Define a callback function to handle the received PSN data
 def callback_function(data):
     global trackers_list
     if isinstance(data, pypsn.psn_data_packet):
-        trackers_list = [tracker.pos for tracker in data.trackers]
+        trackers_list = [vector3_to_dict(tracker.pos) for tracker in data.trackers]
     elif isinstance(data, pypsn.psn_info_packet):
-        trackers_list = [tracker.tracker_name for tracker in data.trackers]
+        trackers_list = [{'tracker_name': tracker.tracker_name} for tracker in data.trackers]
 
 # Create a receiver object with the callback function
 receiver = pypsn.receiver(callback_function)
