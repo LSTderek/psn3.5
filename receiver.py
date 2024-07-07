@@ -15,7 +15,6 @@ LOG_TO_CONSOLE = True
 DISPLAY_TRACKER_UPDATES = True
 LOG_FILE = 'psn_receiver.log'
 FORWARD_DATA_PACKETS = True
-FORWARD_INFO_PACKETS = True
 
 # Set up logging
 logger = logging.getLogger('PSNReceiver')
@@ -183,16 +182,18 @@ def start_udp_receiver():
     mreq = struct.pack("4sl", socket.inet_aton(MULTICAST_GROUP), socket.INADDR_ANY)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-    # Attempt to connect to the data parser
+    logger.info("Starting UDP receiver...")
     data_parser_conn = None
+
+    # Attempt to connect to the Data Parser
     if FORWARD_DATA_PACKETS:
         try:
             data_parser_conn = Client(('localhost', 6001), authkey=b'secret password')
             logger.info("Connected to Data Parser")
-        except ConnectionRefusedError:
-            logger.warning("Data Parser is not available. Running without data parsing.")
+        except Exception as e:
+            logger.error(f"Failed to connect to Data Parser: {e}")
+            data_parser_conn = None
 
-    logger.info("Starting UDP receiver...")
     while True:
         try:
             data, addr = sock.recvfrom(MAX_PACKET_SIZE)
