@@ -4,6 +4,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import re
 from multiprocessing.connection import Client
+import time
 
 MULTICAST_GROUP = '236.10.10.10'
 PORT = 56565
@@ -14,7 +15,7 @@ LOG_TO_FILE = False
 LOG_TO_CONSOLE = True
 DISPLAY_TRACKER_UPDATES = True
 LOG_FILE = 'psn_receiver.log'
-FORWARD_DATA_PACKETS = True
+FORWARD_DATA_PACKETS = False  # Boolean flag to enable forwarding of data packets
 
 # Set up logging
 logger = logging.getLogger('PSNReceiver')
