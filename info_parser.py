@@ -1,7 +1,7 @@
 import logging
 import struct
 import re
-from multiprocessing.connection import Listener
+from multiprocessing.connection import Listener, Client
 
 # Configuration for logging
 LOG_TO_FILE = False
@@ -122,6 +122,8 @@ def start_info_parser():
                 conn.send(chunks)
             except Exception as e:
                 logger.error(f"Error parsing info packet: {e}")
+                conn.close()
+                break
 
 if __name__ == "__main__":
     start_info_parser()
