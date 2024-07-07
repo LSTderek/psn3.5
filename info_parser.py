@@ -106,7 +106,7 @@ def format_tracker_list(tracker_list):
     return "\n".join(formatted_list)
 
 def start_info_parser():
-    listener = Listener(('localhost', 6000), authkey=b'info_parser')
+    listener = Listener(('localhost', 6000), authkey=b'psn_secret_key')
     logger.info("InfoParser started and waiting for connections...")
     while True:
         with listener.accept() as conn:
@@ -117,7 +117,15 @@ def start_info_parser():
                     if packet == 'CLOSE':
                         break
                     parsed_info = parse_psn_info_packet(packet)
-                    logger.info(f"Parsed Info Packet: {parsed_info}")
+                    for sub_chunk_type, sub_chunk_data in parsed_info:
+                        if sub_chunk_type == 'PSN_INFO_PACKET_HEADER':
+                            logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
+                        elif sub_chunk_type == 'PSN_INFO_SYSTEM_NAME':
+                            logger.info(f"  PSN_INFO_SYSTEM_NAME: {sub_chunk_data}")
+                        elif sub_chunk_type == 'PSN_INFO_TRACKER_LIST':
+                            logger.info("  PSN_INFO_TRACKER_LIST:\n" + format_tracker_list(sub_chunk_data))
+                        else:
+                            logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
                 except EOFError:
                     break
                 except Exception as e:
