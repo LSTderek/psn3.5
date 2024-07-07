@@ -28,12 +28,14 @@ def get_trackers():
 
 # Function to run Flask app
 def run_flask():
-    app.run(host='0.0.0.0', debug=True, use_reloader=False)
+    print("Starting Flask server...")
+    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
 
 # Start the receiver and Flask server in separate threads
 if __name__ == '__main__':
     try:
         # Start the receiver
+        print("Starting PSN receiver...")
         receiver_thread = Thread(target=receiver.start)
         receiver_thread.start()
 
@@ -49,10 +51,6 @@ if __name__ == '__main__':
 
         # Stop the receiver
         receiver.stop()
-
-        # Stopping Flask server is more complex; ideally, we'd need to
-        # implement a way to gracefully shut it down if running in production.
-        # For simplicity, we'll let Flask's debug mode handle it.
 
         # Wait for threads to finish
         receiver_thread.join()
