@@ -4,6 +4,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import re
 from multiprocessing.connection import Client
+import time
 
 MULTICAST_GROUP = '236.10.10.10'
 PORT = 56565
@@ -182,12 +183,21 @@ def start_udp_receiver():
                             logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
 
                     # Update the trackers dictionary
+                    new_trackers = {}
                     for tracker_name, tracker_id in tracker_list:
-                        trackers[tracker_name] = {
+                        new_trackers[tracker_name] = {
                             'id': tracker_id,
                             'system_name': system_name,
                             'ip_address': ip_address
                         }
+                    
+                    # Remove trackers not in the current frame
+                    for tracker_name in list(trackers):
+                        if tracker_name not in new_trackers:
+                            del trackers[tracker_name]
+
+                    # Add or update trackers from the current frame
+                    trackers.update(new_trackers)
 
                     if DISPLAY_TRACKER_UPDATES:
                         print(f"Updated trackers: {trackers}")
