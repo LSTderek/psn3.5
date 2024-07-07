@@ -1,7 +1,7 @@
 import logging
 import struct
 import re
-from multiprocessing.connection import Listener, Client
+from multiprocessing.connection import Listener
 
 # Configuration for logging
 LOG_TO_FILE = False
@@ -14,7 +14,7 @@ logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 if LOG_TO_FILE:
-    file_handler = RotatingFileHandler(LOG_FILE, maxBytes=1024*1024, backupCount=5)
+    file_handler = logging.handlers.RotatingFileHandler(LOG_FILE, maxBytes=1024*1024, backupCount=5)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
@@ -106,24 +106,23 @@ def format_tracker_list(tracker_list):
     return "\n".join(formatted_list)
 
 def start_info_parser():
-    listener = Listener(('localhost', 6000))
-
-    logger.info("Starting Info Packet Parser...")
+    listener = Listener(('localhost', 6000), authkey=b'info_parser')
+    logger.info("InfoParser started and waiting for connections...")
     while True:
-        conn = listener.accept()
-        logger.info("Connection accepted from: %s" % str(listener.last_accepted))
-        while True:
-            try:
-                data = conn.recv()
-                if not data:
+        with listener.accept() as conn:
+            logger.info('Connection accepted from receiver')
+            while True:
+                try:
+                    packet = conn.recv()
+                    if packet == 'CLOSE':
+                        break
+                    parsed_info = parse_psn_info_packet(packet)
+                    logger.info(f"Parsed Info Packet: {parsed_info}")
+                except EOFError:
                     break
-                chunks = parse_psn_info_packet(data)
-                logger.info(f"Parsed Info Packet: {chunks}")
-                conn.send(chunks)
-            except Exception as e:
-                logger.error(f"Error parsing info packet: {e}")
-                conn.close()
-                break
+                except Exception as e:
+                    logger.error(f"Error processing packet: {e}")
+                    break
 
 if __name__ == "__main__":
     start_info_parser()
