@@ -2,8 +2,9 @@ import socket
 import struct
 import logging
 from logging.handlers import RotatingFileHandler
-from multiprocessing.connection import Client
 import re
+from multiprocessing.connection import Client
+import time
 
 MULTICAST_GROUP = '236.10.10.10'
 PORT = 56565
@@ -13,7 +14,6 @@ MAX_PACKET_SIZE = 1500
 LOG_TO_FILE = False
 LOG_TO_CONSOLE = True
 DISPLAY_TRACKER_UPDATES = True
-FORWARD_DATA_PACKETS = False
 LOG_FILE = 'psn_receiver.log'
 
 # Set up logging
@@ -30,6 +30,10 @@ if LOG_TO_CONSOLE:
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
+
+# Flags for enabling/disabling logging of packet forwarding and receiving
+LOG_FORWARDING = False
+LOG_RECEIVING = False
 
 class PSNChunkHeader:
     def __init__(self, raw_header):
@@ -78,10 +82,8 @@ def parse_chunks(data, offset=0):
             offset += chunk_header.data_len
             if chunk_header.id == 0x6756:
                 chunks.append(('PSN_INFO_PACKET', parse_psn_info_packet(chunk_data)))
-            elif chunk_header.id == 0x0000:
-                chunks.append(('PSN_DATA_PACKET_HEADER', chunk_data))
             else:
-                chunks.append(('UNKNOWN_CHUNK', chunk_data))
+                chunks.append(('PSN_DATA_PACKET', chunk_data))
         except Exception as e:
             logger.error(f"Error parsing chunk: {e}")
             break
@@ -132,32 +134,36 @@ def format_tracker_list(tracker_list):
         formatted_list.append(f"    TrackerID: {tracker_id:<5} Name: {tracker_name}")
     return "\n".join(formatted_list)
 
-# Store available trackers and active frame IDs
+# Store available trackers
 trackers = {}
-active_frame_id = None
+
+def connect_to_data_parser():
+    while True:
+        try:
+            conn = Client(('localhost', 6000), authkey=b'data_parser')
+            logger.info("Connected to Data Parser")
+            return conn
+        except ConnectionRefusedError:
+            logger.warning("Data Parser not available, retrying...")
+            time.sleep(5)
 
 def start_udp_receiver():
-    global active_frame_id
+    data_conn = connect_to_data_parser()
+    
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind((MULTICAST_GROUP, PORT))
     mreq = struct.pack("4sl", socket.inet_aton(MULTICAST_GROUP), socket.INADDR_ANY)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-    data_parser_conn = None
-    if FORWARD_DATA_PACKETS:
-        try:
-            data_parser_conn = Client(('localhost', 6000), authkey=b'secretkey')
-        except ConnectionRefusedError:
-            logger.error("Data parser connection failed. Ensure data_parser.py is running.")
-            return
-
     logger.info("Starting UDP receiver...")
     while True:
         try:
             data, addr = sock.recvfrom(MAX_PACKET_SIZE)
             ip_address = addr[0]
-            logger.info(f"Received packet from {ip_address}")
+            
+            if LOG_RECEIVING:
+                logger.info(f"Received packet from {ip_address}")
 
             chunks = parse_chunks(data)
             for chunk_type, chunk_data in chunks:
@@ -166,7 +172,6 @@ def start_udp_receiver():
                     tracker_list = []
                     for sub_chunk_type, sub_chunk_data in chunk_data:
                         if sub_chunk_type == 'PSN_INFO_PACKET_HEADER':
-                            active_frame_id = sub_chunk_data.frame_id
                             logger.info(f"  {sub_chunk_type}: {sub_chunk_data}")
                         elif sub_chunk_type == 'PSN_INFO_SYSTEM_NAME':
                             system_name = sub_chunk_data
@@ -197,15 +202,17 @@ def start_udp_receiver():
                     if DISPLAY_TRACKER_UPDATES:
                         print(f"Updated trackers: {trackers}")
 
-                elif chunk_type == 'PSN_DATA_PACKET_HEADER' and FORWARD_DATA_PACKETS:
-                    if data_parser_conn:
-                        data_parser_conn.send(chunk_data)
-                        logger.info(f"Forwarded PSN_DATA_PACKET to data parser.")
-                    else:
-                        logger.error("Data parser connection not available.")
+                elif chunk_type == 'PSN_DATA_PACKET':
+                    try:
+                        data_conn.send(chunk_data)
+                        if LOG_FORWARDING:
+                            logger.info("Sent PSN_DATA_PACKET to Data Parser")
+                    except Exception as e:
+                        logger.error(f"Failed to send to Data Parser: {e}")
+                        data_conn = connect_to_data_parser()
+
         except Exception as e:
             logger.error(f"Error receiving data: {e}")
-            break
 
 if __name__ == "__main__":
     start_udp_receiver()
