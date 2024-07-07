@@ -72,15 +72,9 @@ def start_data_parser():
                 try:
                     data = conn.recv()
                     if data:
-                        # Parse the chunk header (4 bytes)
                         chunk_header = PSNChunkHeader(data[:4])
-                        
-                        # Parse the PSN data packet header (12 bytes)
                         header = PSNDataPacketHeader(data[4:16])
-                        
-                        # Remaining raw data starts after the 16th byte
-                        remaining_data = data[16:16 + chunk_header.data_len - 12]
-
+                        remaining_data = data[16:16+chunk_header.data_len]
                         logger.info(f"Parsed Chunk Header: {chunk_header}")
                         logger.info(f"Parsed Data Packet Header: {header}")
                         logger.info(f"Remaining Raw Data: {remaining_data}")
@@ -90,4 +84,3 @@ def start_data_parser():
 
 if __name__ == "__main__":
     start_data_parser()
-
