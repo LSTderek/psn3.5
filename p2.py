@@ -28,7 +28,7 @@ def get_trackers():
 
 # Function to run Flask app
 def run_flask():
-    app.run(debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', debug=True, use_reloader=False)
 
 # Start the receiver and Flask server in separate threads
 if __name__ == '__main__':
