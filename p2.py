@@ -20,8 +20,7 @@ def callback_function(data):
     global system_info, trackers_list
     if isinstance(data, pypsn.psn_info_packet):
         system_info = {
-            'server_name': bytes_to_str(data.name),
-            'system_type': bytes_to_str(data.system_type)
+            'server_name': bytes_to_str(data.name)
         }
         trackers_list = [{'tracker_name': bytes_to_str(tracker.tracker_name)} for tracker in data.trackers]
 
@@ -43,10 +42,6 @@ def display_info():
             <tr>
                 <th>Server Name</th>
                 <td>{{ system_info.server_name }}</td>
-            </tr>
-            <tr>
-                <th>System Type</th>
-                <td>{{ system_info.system_type }}</td>
             </tr>
         </table>
         <h1>Available Trackers</h1>
