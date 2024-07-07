@@ -7,7 +7,8 @@ import time
 # Initialize Flask app
 app = Flask(__name__)
 
-# List to store tracker names
+# Lists to store system information and tracker names
+system_info = {}
 trackers_list = []
 
 # Define a function to convert bytes to string
@@ -16,23 +17,38 @@ def bytes_to_str(b):
 
 # Define a callback function to handle the received PSN data
 def callback_function(data):
-    global trackers_list
+    global system_info, trackers_list
     if isinstance(data, pypsn.psn_info_packet):
+        system_info = {
+            'server_name': bytes_to_str(data.name),
+            'system_type': bytes_to_str(data.system_type)
+        }
         trackers_list = [{'tracker_name': bytes_to_str(tracker.tracker_name)} for tracker in data.trackers]
 
 # Create a receiver object with the callback function
 receiver = pypsn.receiver(callback_function)
 
-# Define route to display available trackers in a table
+# Define route to display system info and available trackers in tables
 @app.route('/', methods=['GET'])
-def display_trackers():
+def display_info():
     html_template = """
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Available Trackers</title>
+        <title>PSN System Info and Trackers</title>
     </head>
     <body>
+        <h1>System Information</h1>
+        <table border="1">
+            <tr>
+                <th>Server Name</th>
+                <td>{{ system_info.server_name }}</td>
+            </tr>
+            <tr>
+                <th>System Type</th>
+                <td>{{ system_info.system_type }}</td>
+            </tr>
+        </table>
         <h1>Available Trackers</h1>
         <table border="1">
             <tr>
@@ -47,7 +63,7 @@ def display_trackers():
     </body>
     </html>
     """
-    return render_template_string(html_template, trackers=trackers_list)
+    return render_template_string(html_template, system_info=system_info, trackers=trackers_list)
 
 # Function to run Flask app
 def run_flask():
