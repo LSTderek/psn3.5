@@ -30,6 +30,10 @@ if LOG_TO_CONSOLE:
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
+# Flags for enabling/disabling logging of packet forwarding and receiving
+LOG_FORWARDING = False
+LOG_RECEIVING = False
+
 class PSNChunkHeader:
     def __init__(self, raw_header):
         try:
@@ -156,7 +160,9 @@ def start_udp_receiver():
         try:
             data, addr = sock.recvfrom(MAX_PACKET_SIZE)
             ip_address = addr[0]
-            logger.info(f"Received packet from {ip_address}")
+            
+            if LOG_RECEIVING:
+                logger.info(f"Received packet from {ip_address}")
 
             chunks = parse_chunks(data)
             for chunk_type, chunk_data in chunks:
@@ -189,7 +195,8 @@ def start_udp_receiver():
                 elif chunk_type == 'PSN_DATA_PACKET':
                     try:
                         data_conn.send(chunk_data)
-                        logger.info("Sent PSN_DATA_PACKET to Data Parser")
+                        if LOG_FORWARDING:
+                            logger.info("Sent PSN_DATA_PACKET to Data Parser")
                     except Exception as e:
                         logger.error(f"Failed to send to Data Parser: {e}")
                         data_conn = connect_to_data_parser()
