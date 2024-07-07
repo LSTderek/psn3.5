@@ -21,14 +21,17 @@ def callback_function(data):
     global system_info, trackers_list
     if isinstance(data, pypsn.psn_info_packet):
         system_info = {
-            'server_name': bytes_to_str(data.name),
-            'packet_timestamp': data.packet_timestamp,
-            'version_high': data.version_high,
-            'version_low': data.version_low,
-            'frame_id': data.frame_id,
-            'frame_packet_count': data.frame_packet_count,
-            'ip_address': socket.gethostbyname(socket.gethostname())
+            'server_name': bytes_to_str(data.name)
         }
+        # Add dummy values for testing
+        system_info.update({
+            'ip_address': socket.gethostbyname(socket.gethostname()),
+            'packet_timestamp': "N/A",
+            'version_high': "N/A",
+            'version_low': "N/A",
+            'frame_id': "N/A",
+            'frame_packet_count': "N/A"
+        })
         trackers_list = [{'tracker_name': bytes_to_str(tracker.tracker_name)} for tracker in data.trackers]
 
 # Create a receiver object with the callback function
