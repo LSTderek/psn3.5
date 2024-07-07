@@ -13,7 +13,7 @@ LOG_TO_FILE = False
 LOG_TO_CONSOLE = True
 DISPLAY_TRACKER_UPDATES = True
 ENABLE_INFO_PARSER = True
-ENABLE_DATA_PARSER = False
+ENABLE_DATA_PARSER = True
 LOG_FILE = 'psn_receiver.log'
 
 # Set up logging
@@ -67,17 +67,18 @@ def start_udp_receiver():
         try:
             data, addr = sock.recvfrom(MAX_PACKET_SIZE)
             ip_address = addr[0]
-            logger.info(f"Received raw packet from {ip_address}: {data}")
             chunk_header = PSNChunkHeader(data[:4])
             
             if chunk_header.id == 0x6756 and ENABLE_INFO_PARSER:
                 info_parser_conn.send(data)
+                logger.info(f"Sent packet to info parser from {ip_address}")
                 parsed_info = info_parser_conn.recv()
-                logger.info(f"Parsed Info Packet: {parsed_info}")
+                logger.info(f"Info parser returned: {parsed_info}")
             elif chunk_header.id == 0x1234 and ENABLE_DATA_PARSER:
                 data_parser_conn.send(data)
+                logger.info(f"Sent packet to data parser from {ip_address}")
                 parsed_data = data_parser_conn.recv()
-                logger.info(f"Parsed Data Packet: {parsed_data}")
+                logger.info(f"Data parser returned: {parsed_data}")
             else:
                 logger.info(f"Unhandled packet type with chunk ID: {chunk_header.id}")
         except Exception as e:
