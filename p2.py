@@ -1,6 +1,6 @@
 # Import necessary modules
 import pypsn
-from flask import Flask, jsonify
+from flask import Flask, render_template_string
 from threading import Thread
 import time
 
@@ -23,10 +23,31 @@ def callback_function(data):
 # Create a receiver object with the callback function
 receiver = pypsn.receiver(callback_function)
 
-# Define route to list available trackers
-@app.route('/trackers', methods=['GET'])
-def get_trackers():
-    return jsonify(trackers_list)
+# Define route to display available trackers in a table
+@app.route('/', methods=['GET'])
+def display_trackers():
+    html_template = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Available Trackers</title>
+    </head>
+    <body>
+        <h1>Available Trackers</h1>
+        <table border="1">
+            <tr>
+                <th>Tracker Name</th>
+            </tr>
+            {% for tracker in trackers %}
+            <tr>
+                <td>{{ tracker.tracker_name }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </body>
+    </html>
+    """
+    return render_template_string(html_template, trackers=trackers_list)
 
 # Function to run Flask app
 def run_flask():
