@@ -13,7 +13,7 @@ LOG_TO_FILE = False
 LOG_TO_CONSOLE = True
 DISPLAY_TRACKER_UPDATES = True
 ENABLE_INFO_PARSER = True
-ENABLE_DATA_PARSER = True
+ENABLE_DATA_PARSER = False
 LOG_FILE = 'psn_receiver.log'
 
 # Set up logging
