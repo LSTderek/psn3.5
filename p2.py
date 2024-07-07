@@ -3,6 +3,7 @@ import pypsn
 from flask import Flask, render_template_string
 from threading import Thread
 import time
+import socket
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -19,8 +20,15 @@ def bytes_to_str(b):
 def callback_function(data):
     global system_info, trackers_list
     if isinstance(data, pypsn.psn_info_packet):
+        info = data.info
         system_info = {
-            'server_name': bytes_to_str(data.name)
+            'server_name': bytes_to_str(data.name),
+            'packet_timestamp': info.timestamp,
+            'version_high': info.version_high,
+            'version_low': info.version_low,
+            'frame_id': info.frame_id,
+            'frame_packet_count': info.packet_count,
+            'ip_address': data.ip_address if hasattr(data, 'ip_address') else 'N/A'
         }
         trackers_list = [{'tracker_name': bytes_to_str(tracker.tracker_name)} for tracker in data.trackers]
 
@@ -42,6 +50,30 @@ def display_info():
             <tr>
                 <th>Server Name</th>
                 <td>{{ system_info.server_name }}</td>
+            </tr>
+            <tr>
+                <th>IP Address</th>
+                <td>{{ system_info.ip_address }}</td>
+            </tr>
+            <tr>
+                <th>Packet Timestamp</th>
+                <td>{{ system_info.packet_timestamp }}</td>
+            </tr>
+            <tr>
+                <th>Version High</th>
+                <td>{{ system_info.version_high }}</td>
+            </tr>
+            <tr>
+                <th>Version Low</th>
+                <td>{{ system_info.version_low }}</td>
+            </tr>
+            <tr>
+                <th>Frame ID</th>
+                <td>{{ system_info.frame_id }}</td>
+            </tr>
+            <tr>
+                <th>Frame Packet Count</th>
+                <td>{{ system_info.frame_packet_count }}</td>
             </tr>
         </table>
         <h1>Available Trackers</h1>
